@@ -1,3 +1,19 @@
+{% set cat_colors = {
+  "bug": "bg-red-100 text-red-800",
+  "feature_request": "bg-blue-100 text-blue-800",
+  "question": "bg-slate-100 text-slate-800",
+  "urgent": "bg-orange-100 text-orange-800"
+} %}
+{% set prio_colors = {
+  "P1": "bg-red-600 text-white",
+  "P2": "bg-amber-500 text-white",
+  "P3": "bg-emerald-600 text-white"
+} %}
+{% set status_colors = {
+  "open": "bg-slate-100 text-slate-700",
+  "in_progress": "bg-indigo-100 text-indigo-800",
+  "closed": "bg-green-100 text-green-800"
+} %}
 <table class="min-w-full divide-y divide-slate-200 bg-white shadow-sm ring-1 ring-slate-200 rounded-lg overflow-hidden">
   <thead class="bg-slate-100">
     <tr>
@@ -11,6 +27,30 @@
     </tr>
   </thead>
   <tbody id="tickets-table-body">
-    <!-- TODO: renderizar tickets con Jinja2 -->
+    {% for t in tickets %}
+    <tr class="border-t border-slate-100 hover:bg-slate-50">
+      <td class="px-3 py-2 text-sm text-slate-500">{{ t.id }}</td>
+      <td class="px-3 py-2 text-sm font-medium">{{ t.title }}</td>
+      <td class="px-3 py-2 text-sm">
+        <span class="rounded-full px-2 py-0.5 text-xs font-medium {{ cat_colors.get(t.category, 'bg-slate-100 text-slate-800') }}">{{ t.category }}</span>
+      </td>
+      <td class="px-3 py-2 text-sm">
+        <span class="rounded px-2 py-0.5 text-xs font-semibold {{ prio_colors.get(t.priority, 'bg-slate-200 text-slate-800') }}">{{ t.priority }}</span>
+      </td>
+      <td class="px-3 py-2 text-sm">
+        {% for tag in t.tags %}
+        <span class="mr-1 inline-block rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600">{{ tag }}</span>
+        {% endfor %}
+      </td>
+      <td class="px-3 py-2 text-sm">
+        <span class="rounded-full px-2 py-0.5 text-xs font-medium {{ status_colors.get(t.status, 'bg-slate-100 text-slate-700') }}">{{ t.status }}</span>
+      </td>
+      <td class="px-3 py-2 text-xs text-slate-500">{{ t.created_at[:16].replace("T", " ") }}</td>
+    </tr>
+    {% else %}
+    <tr>
+      <td colspan="7" class="px-3 py-6 text-center text-sm text-slate-400">No hay tickets todavía.</td>
+    </tr>
+    {% endfor %}
   </tbody>
 </table>
