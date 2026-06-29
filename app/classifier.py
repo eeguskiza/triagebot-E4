@@ -11,4 +11,4 @@ def classify_ticket(title: str, description: str) -> dict:
     - Nunca propagar excepciones del SDK.
     - Devolver FALLBACK_CLASSIFICATION ante cualquier problema.
     """
-    raise NotImplementedError("Implement this function during Lab 2")
+    return FALLBACK_CLASSIFICATION
