@@ -38,6 +38,10 @@ def _row_to_dict(row: sqlite3.Row) -> dict:
 
 def create_ticket(data: dict) -> dict:
     now = datetime.now(UTC).isoformat()
+    # created_at/updated_at se generan en servidor; el seeding puede pasar la
+    # fecha original del ticket para preservarla (los endpoints no la pasan).
+    created_at = data.get("created_at") or now
+    updated_at = data.get("updated_at") or created_at
     with get_connection() as conn:
         cur = conn.execute(
             """
@@ -54,8 +58,8 @@ def create_ticket(data: dict) -> dict:
                 data["priority"],
                 json.dumps(data.get("tags", [])),
                 data.get("status", "open"),
-                now,
-                now,
+                created_at,
+                updated_at,
             ),
         )
         row = conn.execute("SELECT * FROM tickets WHERE id = ?", (cur.lastrowid,)).fetchone()
