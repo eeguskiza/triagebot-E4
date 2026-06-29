@@ -1,10 +1,7 @@
-from typing import Optional
-
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 
-from app import classifier
-import app.db as db
+from app import classifier, db
 from app.classifier import FALLBACK_CLASSIFICATION
 from app.models import TicketCreate, TicketPatch
 
@@ -21,7 +18,9 @@ def create_ticket(body: TicketCreate):
     try:
         classification = classifier.classify_ticket(body.title, body.description)
     except Exception:
-        classification = dict(FALLBACK_CLASSIFICATION)
+        # Copia independiente del fallback (incluida la lista mutable tags), por
+        # si classify_ticket lanza sin pasar por su propia red de seguridad.
+        classification = {**FALLBACK_CLASSIFICATION, "tags": list(FALLBACK_CLASSIFICATION["tags"])}
 
     ticket = db.create_ticket({
         "title": body.title,
@@ -36,9 +35,9 @@ def create_ticket(body: TicketCreate):
 
 @app.get("/tickets")
 def list_tickets(
-    category: Optional[str] = None,
-    priority: Optional[str] = None,
-    status: Optional[str] = None,
+    category: str | None = None,
+    priority: str | None = None,
+    status: str | None = None,
 ):
     return db.list_tickets(category, priority, status)
 
