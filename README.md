@@ -98,4 +98,12 @@ Los detalles obligatorios están en:
 
 Nombres:
 
-Metodología: `Vibe` / `Spec-Driven`
+- Elena Torralbo Jimenez
+- Erik Eguskiza Aranda
+
+Metodología: `Spec-Driven`
+
+## Autores
+
+- Elena Torralbo Jimenez
+- Erik Eguskiza Aranda
