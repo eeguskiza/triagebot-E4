@@ -37,12 +37,11 @@ Usa el stack del bootcamp:
 
 * Python 3.11+
 * FastAPI
-* SQLModel
-* SQLite
+* SQLite (módulo `sqlite3` de la stdlib) + Pydantic v2 para validación
 * Jinja2
 * HTMX
 * Tailwind CSS por CDN
-* OpenRouter usando SDK compatible con OpenAI
+* LLM pluggable (`LLM_PROVIDER`): `anthropic` (default) | `openrouter` | `local` (servidor OpenAI-compatible)
 * pytest
 * ruff
 * GitHub Actions
@@ -54,11 +53,12 @@ Si necesitas añadir una dependencia porque la especificación la exige, comprue
 
 ## Variables de entorno y secretos
 
-La API key debe leerse desde:
+El backend del clasificador se elige con `LLM_PROVIDER` (`anthropic` por defecto). Las keys se leen del entorno según el backend:
 
-```bash
-OPENROUTER_API_KEY
-```
+* `anthropic` (default): `ANTHROPIC_API_KEY` (+ `CLAUDE_MODEL`).
+* `openrouter` / `local`: `OPENAI_BASE_URL`, `OPENROUTER_API_KEY`, `LLM_MODEL` (usan el SDK `openai`, aún no en `requirements.txt`).
+
+Otra variable: `DATABASE_URL` (ruta SQLite, formato `sqlite:///...`). Detalle completo en `SPEC.md` §4.
 
 Reglas obligatorias:
 
@@ -206,8 +206,8 @@ FALLBACK_CLASSIFICATION = {
 
 Reglas del clasificador:
 
-* Usar `OPENROUTER_API_KEY`.
-* Usar OpenRouter con modelo `openai/gpt-oss-120b`, salvo indicación explícita del profesor.
+* Seleccionar backend con `LLM_PROVIDER` (default `anthropic`); leer la key del entorno según el backend, nunca hardcodeada.
+* Backends: `anthropic` (Claude vía SDK `anthropic`, tool-use forzado) | `openrouter`/`local` (SDK `openai`, JSON estricto). Detalle en `SPEC.md` §8.
 * Pedir al modelo una respuesta estrictamente JSON.
 * Parsear la respuesta.
 * Validar `category`, `priority` y `tags`.
@@ -229,21 +229,22 @@ Estructura recomendada:
 app/
   main.py
   models.py
-  database.py
+  db.py
   classifier.py
   templates/
     index.html
+    _tickets_table.html
 tests/
   test_acceptance.py
 ```
 
 Responsabilidades:
 
-* `main.py`: crear la app FastAPI y definir rutas.
-* `models.py`: modelos SQLModel y schemas Pydantic si hacen falta.
-* `database.py`: engine, creación de tablas, sesiones y helpers CRUD.
+* `main.py`: crear la app FastAPI y definir rutas (API JSON + UI HTMX).
+* `models.py`: schemas Pydantic (`TicketCreate`/`TicketUpdate`/`TicketRead`) y enums permitidos.
+* `db.py`: conexión `sqlite3`, creación idempotente del esquema y helpers CRUD; (de)serialización de `tags`.
 * `classifier.py`: integración con IA y fallback.
-* `templates/index.html`: frontend mínimo.
+* `templates/index.html` + `templates/_tickets_table.html`: frontend mínimo.
 
 Evitar meter todo en `main.py`.
 
@@ -254,8 +255,8 @@ Usar SQLite.
 Reglas:
 
 * La base local puede llamarse `triagebot.db`.
-* La app debe soportar `DATABASE_URL` si está definido, porque los tests pueden usar una base temporal.
-* Crear tablas automáticamente al arrancar o antes de usarlas.
+* La app debe leer `DATABASE_URL` (formato `sqlite:///...`) **en cada petición/conexión**, no en import-time: los tests lo inyectan con `monkeypatch.setenv` antes de crear el `TestClient` y NO usan el context manager (no se dispara `startup`). Resolverlo al importar rompe los tests.
+* Crear el esquema de forma idempotente (`CREATE TABLE IF NOT EXISTS`) antes de usarlo; no dependas solo de `@app.on_event("startup")`.
 * No commitear archivos `.db`, `.sqlite` ni `.sqlite3`.
 * Guardar `tags` de forma compatible con SQLite. Puede usarse JSON serializado si es necesario.
 
@@ -372,7 +373,7 @@ Restricciones:
 - No modificar tests/test_acceptance.py.
 - No hardcodear claves.
 - No romper endpoints existentes.
-- Mantener FastAPI + SQLModel + SQLite.
+- Mantener FastAPI + SQLite (`sqlite3`) + Pydantic.
 - Aplicar fallback si falla el clasificador.
 
 Criterios de aceptación:
