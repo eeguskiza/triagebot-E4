@@ -1,7 +1,7 @@
 import json
 import os
 import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 def _get_db_path() -> str:
@@ -41,12 +41,15 @@ def _row_to_dict(row: sqlite3.Row) -> dict:
 
 
 def create_ticket(data: dict) -> dict:
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     tags_json = json.dumps(data.get("tags", []))
     with get_connection() as conn:
         cur = conn.execute(
             """
-            INSERT INTO tickets (title, description, category, priority, tags, status, created_at, updated_at)
+            INSERT INTO tickets (
+                title, description, category, priority,
+                tags, status, created_at, updated_at
+            )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
@@ -92,7 +95,7 @@ def update_ticket(ticket_id: int, data: dict) -> dict | None:
     row = get_ticket(ticket_id)
     if row is None:
         return None
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     fields = {k: v for k, v in data.items() if v is not None}
     fields["updated_at"] = now
     set_clause = ", ".join(f"{k} = ?" for k in fields)
