@@ -107,3 +107,7 @@ Metodología: `Spec-Driven`
 
 - Elena Torralbo Jimenez
 - Erik Eguskiza Aranda
+
+## Estado del proyecto
+
+En desarrollo activo durante el bootcamp.
