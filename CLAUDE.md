@@ -37,6 +37,8 @@ reintenta ×1, fallback=copia). Pista: un ticket `question/P3/sin tags` = se apl
 
 **API JSON** (contrato, cubierto por tests): `POST /tickets` (201) · `GET /tickets`
 (filtros combinables: `category`, `priority`, `status`, **`assignee`**, **`overdue`**) ·
+**`GET /tickets/stats`** (resumen para Marta: `total` + conteos `by_category`/`by_priority`/`by_status`;
+declarado **antes** de `/tickets/{id}` para no colisionar) ·
 `GET /tickets/{id}` (200/404) · `PATCH /tickets/{id}` (`status`/`priority`; 200/404/422).
 
 **Frontend HTMX** (`templates/index.html` + `_tickets_table.html`): `GET /` (página, acepta filtros
@@ -46,13 +48,15 @@ Incluye: formulario (título + textarea), tablero de 9 columnas, **filtros** (ca
 responsable + "solo vencidos") + **buscador** (`q`), **paginación** (20/pág), **edición inline**, "desde
 cuándo", badge **VENCIDO**, layout ancho con scroll horizontal y estado en la URL (`hx-push-url`).
 `db.list_tickets`/`count_tickets` aceptan `q/limit/offset/assignee/overdue` opcionales (aditivos: sin
-ellos el comportamiento es el histórico → el contrato JSON no cambia).
+ellos el comportamiento es el histórico → el contrato JSON no cambia). SQLite usa **WAL +
+`busy_timeout=5000`** para concurrencia de escritura.
 
-**Tests y CI**: además de `tests/test_acceptance.py` (5 obligatorios, **NO tocar**) hay
-`test_lab3_backend.py`, `test_classifier_unit.py`, `test_ui.py`, `test_integration.py`, `test_db.py`,
-`test_lifecycle_assignees.py`, `test_due_date.py` (+ benchmarks). CI (`.github/workflows/ci.yml`): matriz
-**Python 3.11/3.12**, cache pip, `ruff` + `pytest --cov`, **umbral 65%**, y un job `pages` que publica un
-dashboard de cobertura a GitHub Pages (solo en `main`). E501 ignorado en `tests/*.py`.
+**Tests y CI** (~120 tests, cobertura ~98%): además de `tests/test_acceptance.py` (5 obligatorios,
+**NO tocar**) hay `test_lab3_backend.py`, `test_classifier_unit.py`, `test_ui.py`, `test_integration.py`,
+`test_db.py`, `test_lifecycle_assignees.py`, `test_due_date.py`, **`test_robustness.py`** (casos límite QA:
+unicode, XSS, SQLi, duplicados, IDs malformados, concurrencia) (+ benchmarks). CI
+(`.github/workflows/ci.yml`): matriz **Python 3.11/3.12**, cache pip, `ruff` + `pytest --cov`, **umbral 65%**,
+y un job `pages` que publica un dashboard de cobertura a GitHub Pages (solo en `main`). E501 ignorado en `tests/*.py`.
 
 **Arrancar / demo** (¡hay columnas nuevas → recrear la BD!):
 ```bash
@@ -61,6 +65,29 @@ rm -f triagebot.db && python -m app.seed --reset   # esquema nuevo + ~140 ticket
 uvicorn app.main:app --reload                        # http://127.0.0.1:8000
 ```
 Seed: `python -m app.seed [--fallback] [--limit N] [--reset]` (`--fallback` no gasta cuota).
+
+### Bugs conocidos / deuda técnica (auditoría QA — PENDIENTES de arreglar)
+
+Encontrados en una caza de bugs con verificación por reproducción. **Aún no están arreglados** (salvo
+que un PR posterior lo indique). Seguridad: SQLi y XSS están **mitigados** (queries parametrizadas +
+autoescape de Jinja); la prompt-injection es de bajo impacto (la salida del LLM se valida contra enums).
+
+- 🔴 **Blocker — esquema sin migrar**: una `triagebot.db` antigua (sin `assignees`/`status_changed_at`/
+  `due_date`) da **500 en todos los endpoints** (`CREATE TABLE IF NOT EXISTS` no añade columnas). Workaround:
+  borrar la BD. Fix real: `ALTER TABLE` idempotente en `get_connection` (`PRAGMA table_info`).
+- 🟠 **P1 nace vencido**: `_DUE_DAYS["P1"]=0` → `due_date==created_at` → todo P1 sale VENCIDO al instante.
+- 🟠 **`classify_ticket` puede lanzar**: si el LLM devuelve `category`/`priority` no-hasheable (lista/dict),
+  el `in set(...)` lanza `TypeError` (rompe el "nunca lanza"). Fix: validar `isinstance(str)` antes.
+- 🟠 **Config rompe el arranque**: `MAX_TAGS`/`MAX_TAG_LEN` no numérico → `int()` peta en import.
+  `TICKET_CATEGORIES`/`PRIORITIES` vacío → enum vacío → toda clasificación al fallback.
+- 🟠 **`id` ≥ 2⁶³** en `GET/PATCH /tickets/{id}` → 500 (OverflowError) en vez de 404.
+- 🟠 **`due_date` no se recalcula** al cambiar `priority` (PATCH/inline).
+- 🟠 **Seed todo vencido**: los 140 ejemplos tienen fechas fijas pasadas → salen todos VENCIDOS.
+- 🟠 **Default `open` incoherente**: `GET /` fija `open`, pero recargar `/ui/tickets` no → misma vista,
+  datos distintos.
+- 🟡 **Menores**: comodines LIKE `%`/`_` sin escapar en `q`/`assignee`; formatos de fecha mezclados
+  (`Z` vs `+00:00`) afectan el orden; `page` no entero → 422; selects del tablero hardcodeados (no siguen a
+  `TICKET_STATUSES`); `seed --limit` negativo; tags del clasificador no re-acotados al persistir.
 
 ---
 
