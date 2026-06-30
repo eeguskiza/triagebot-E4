@@ -80,6 +80,14 @@
           <option value="in_progress" {% if filters.status == "in_progress" %}selected{% endif %}>in_progress</option>
           <option value="closed" {% if filters.status == "closed" %}selected{% endif %}>closed</option>
         </select>
+        <label class="flex items-center gap-2 cursor-pointer select-none rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50">
+          <input type="checkbox" name="overdue" value="true"
+                 {% if filters.overdue %}checked{% endif %}
+                 hx-get="/ui/tickets" hx-target="#tickets-container" hx-swap="innerHTML"
+                 hx-trigger="change" hx-include="#filters" hx-push-url="true"
+                 class="accent-red-600 w-4 h-4">
+          Solo vencidos
+        </label>
       </div>
     </section>
 

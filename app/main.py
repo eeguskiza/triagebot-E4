@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi import FastAPI, Form, HTTPException, Request
@@ -62,8 +63,9 @@ def list_tickets(
     category: str | None = None,
     priority: str | None = None,
     status: str | None = None,
+    overdue: bool = False,
 ):
-    return db.list_tickets(category, priority, status)
+    return db.list_tickets(category, priority, status, overdue=overdue)
 
 
 @app.get("/tickets/{ticket_id}")
@@ -97,14 +99,16 @@ def _render_board(
     page: int,
     *,
     full_page: bool,
+    overdue: bool = False,
 ):
     """Renderiza el tablero (página completa o solo el fragmento de tabla) con
     filtros + búsqueda + paginación. Lógica compartida por todas las rutas UI."""
-    total = db.count_tickets(category, priority, status, q)
+    total = db.count_tickets(category, priority, status, q, overdue=overdue)
     pages = max((total + PAGE_SIZE - 1) // PAGE_SIZE, 1)
     page = min(max(page, 1), pages)
     tickets = db.list_tickets(
-        category, priority, status, q, limit=PAGE_SIZE, offset=(page - 1) * PAGE_SIZE
+        category, priority, status, q,
+        limit=PAGE_SIZE, offset=(page - 1) * PAGE_SIZE, overdue=overdue,
     )
     context = {
         "tickets": tickets,
@@ -113,7 +117,9 @@ def _render_board(
             "priority": priority or "",
             "status": status or "",
             "q": q or "",
+            "overdue": overdue,
         },
+        "now_iso": datetime.now(UTC).isoformat(),
         "page": page,
         "pages": pages,
         "total": total,
@@ -131,13 +137,14 @@ def index(
     status: str | None = None,
     q: str | None = None,
     page: int = 1,
+    overdue: bool = False,
 ):
     # UX para Marta: en la primera carga (sin parámetro `status`) mostramos
     # los abiertos. Elegir "Estado (todos)" envía status="" → muestra todo.
-    effective_status = "open" if status is None else (status or None)
+    effective_status = "open" if (status is None and not overdue) else (status or None)
     return _render_board(
         request, category or None, priority or None, effective_status, q or None,
-        page, full_page=True,
+        page, full_page=True, overdue=overdue,
     )
 
 
@@ -149,13 +156,14 @@ def ui_list_tickets(
     status: str | None = None,
     q: str | None = None,
     page: int = 1,
+    overdue: bool = False,
 ):
     # Si la petición no viene de HTMX (recarga del navegador sobre la URL
     # pusheada), devolvemos la página completa para no perder el formulario.
     is_htmx = request.headers.get("HX-Request") == "true"
     return _render_board(
         request, category or None, priority or None, status or None, q or None,
-        page, full_page=not is_htmx,
+        page, full_page=not is_htmx, overdue=overdue,
     )
 
 
@@ -168,6 +176,7 @@ def ui_create_ticket(
     priority: str = Form(""),
     status: str = Form(""),
     q: str = Form(""),
+    overdue: str = Form(""),
 ):
     # Reutilizamos la validación de TicketCreate (strip + longitudes). Si la
     # entrada es inválida no creamos nada y devolvemos la tabla tal cual.
@@ -180,7 +189,7 @@ def ui_create_ticket(
     # Respetamos los filtros/búsqueda activos (el form los envía vía hx-include).
     return _render_board(
         request, category or None, priority or None, status or None, q or None,
-        page=1, full_page=False,
+        page=1, full_page=False, overdue=overdue == "true",
     )
 
 
@@ -195,6 +204,7 @@ def ui_update_ticket(
     status: str = Form(""),
     q: str = Form(""),
     page: int = Form(1),
+    overdue: str = Form(""),
 ):
     # Edición inline desde el tablero (Marta §4). Solo cambia el campo enviado;
     # valida enums con TicketPatch y persiste con db.update_ticket (sin duplicar).
@@ -208,5 +218,5 @@ def ui_update_ticket(
     # la reajusta si al cambiar el ticket la página deja de existir.
     return _render_board(
         request, category or None, priority or None, status or None, q or None,
-        page=page, full_page=False,
+        page=page, full_page=False, overdue=overdue == "true",
     )
