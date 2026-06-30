@@ -47,7 +47,7 @@ jobs:
         run: ruff check .
 
       - name: Tests + coverage
-        run: pytest -v --cov=app --cov-report=html --cov-report=json:htmlcov/coverage.json --junit-xml=htmlcov/junit.xml
+        run: pytest -v --cov=app --cov-report=html --cov-report=json:htmlcov/coverage.json --junit-xml=htmlcov/junit.xml --benchmark-disable
 
       - name: Upload coverage artifact
         if: always()
