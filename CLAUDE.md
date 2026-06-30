@@ -6,6 +6,64 @@ Este repositorio contiene **TriageBot**, una aplicación web interna para crear,
 
 El equipo trabaja con metodología **Spec-Driven**. Antes de implementar código, hay que leer la especificación, planificar los cambios y asegurar que la implementación respeta los tests de aceptación.
 
+---
+
+## Estado actual (IMPLEMENTADO — leer primero)
+
+> El proyecto **ya está implementado** y en `main` con **CI verde** (~106 tests, cobertura ~98%).
+> Esta sección refleja la **realidad actual**. Si alguna sección de más abajo habla en futuro o
+> dice "TODO", está obsoleta: **manda lo de aquí**. El contrato base (modelo, endpoints, reglas
+> no negociables) sigue vigente; aquí se amplía con lo añadido después.
+
+**Equipo y método**: Erik Eguskiza (`eeguskiza`) y Elena Torralbo, Spec-Driven. Una rama por
+persona + PR a `main`; **nadie commitea directo a `main`** y **no se mergea con CI rojo**. Los
+commits/PR se hacen **a nombre del usuario, sin trailer `Co-Authored-By`**; los PR se crean por
+**API REST de GitHub** (no hay `gh` instalado). El repo es un **fork** (Actions se habilitaron a mano).
+
+**Clasificador IA** (`app/classifier.py`): pluggable por `LLM_PROVIDER`; **backend activo = `openrouter`**
+(SDK `openai`, **ya en `requirements.txt`**). Default de código y `.env.example`: `LLM_MODEL=google/gemini-3.1-flash-lite`.
+El `.env` local (no commiteado) tiene `OPENROUTER_API_KEY`, `LLM_PROVIDER=openrouter`,
+`OPENAI_BASE_URL=https://openrouter.ai/api/v1`, `LLM_MODEL`. Nunca lanza (valida enums, normaliza tags,
+reintenta ×1, fallback=copia). Pista: un ticket `question/P3/sin tags` = se aplicó el fallback.
+
+**Modelo de datos real** (entidad `Ticket`): `id`, `title`, `description`, `category`, `priority`,
+`tags`, **`assignees`** (lista de responsables), `status`, `created_at`, `updated_at`,
+**`status_changed_at`**, **`due_date`**.
+- `status` ∈ `open | in_progress | resolved | closed` (default `open`); **reabrir** = volver a `open`.
+- `status_changed_at`: "desde cuándo está en ese estado" (se fija al crear, se actualiza al cambiar `status`).
+- `due_date`: fecha límite por prioridad (P1=hoy, P2=+1d, P3=+2d). **Vencido** = `due_date` pasada y status no terminal (`closed`/`resolved`).
+- `assignees`: varios responsables (JSON, como `tags`).
+- `app/config.py`: enums/límites por entorno (`TICKET_CATEGORIES`, `TICKET_PRIORITIES`, `TICKET_STATUSES`, `MAX_TAGS`, `MAX_TAG_LEN`, `FALLBACK_CATEGORY/PRIORITY`). `ALLOWED_*` de `models.py` salen de aquí.
+
+**API JSON** (contrato, cubierto por tests): `POST /tickets` (201) · `GET /tickets`
+(filtros combinables: `category`, `priority`, `status`, **`assignee`**, **`overdue`**) ·
+`GET /tickets/{id}` (200/404) · `PATCH /tickets/{id}` (`status`/`priority`; 200/404/422).
+
+**Frontend HTMX** (`templates/index.html` + `_tickets_table.html`): `GET /` (página, acepta filtros
+por query, default `status=open`), `GET /ui/tickets` (fragmento; página completa si no es petición HTMX),
+`POST /ui/tickets` (crear), `POST /ui/tickets/{id}` (edición inline de estado/prioridad/responsables).
+Incluye: formulario (título + textarea), tablero de 9 columnas, **filtros** (categoría/prioridad/estado +
+responsable + "solo vencidos") + **buscador** (`q`), **paginación** (20/pág), **edición inline**, "desde
+cuándo", badge **VENCIDO**, layout ancho con scroll horizontal y estado en la URL (`hx-push-url`).
+`db.list_tickets`/`count_tickets` aceptan `q/limit/offset/assignee/overdue` opcionales (aditivos: sin
+ellos el comportamiento es el histórico → el contrato JSON no cambia).
+
+**Tests y CI**: además de `tests/test_acceptance.py` (5 obligatorios, **NO tocar**) hay
+`test_lab3_backend.py`, `test_classifier_unit.py`, `test_ui.py`, `test_integration.py`, `test_db.py`,
+`test_lifecycle_assignees.py`, `test_due_date.py` (+ benchmarks). CI (`.github/workflows/ci.yml`): matriz
+**Python 3.11/3.12**, cache pip, `ruff` + `pytest --cov`, **umbral 65%**, y un job `pages` que publica un
+dashboard de cobertura a GitHub Pages (solo en `main`). E501 ignorado en `tests/*.py`.
+
+**Arrancar / demo** (¡hay columnas nuevas → recrear la BD!):
+```bash
+pip install -r requirements.txt
+rm -f triagebot.db && python -m app.seed --reset   # esquema nuevo + ~140 tickets clasificados
+uvicorn app.main:app --reload                        # http://127.0.0.1:8000
+```
+Seed: `python -m app.seed [--fallback] [--limit N] [--reset]` (`--fallback` no gasta cuota).
+
+---
+
 ## Fuentes de verdad
 
 Antes de modificar código, revisa siempre estos archivos:
@@ -41,7 +99,7 @@ Usa el stack del bootcamp:
 * Jinja2
 * HTMX
 * Tailwind CSS por CDN
-* LLM pluggable (`LLM_PROVIDER`): `anthropic` (default) | `openrouter` | `local` (servidor OpenAI-compatible)
+* LLM pluggable (`LLM_PROVIDER`): **`openrouter` (activo/default actual)** | `anthropic` | `local`. SDK `openai` **ya en `requirements.txt`**
 * pytest
 * ruff
 * GitHub Actions
@@ -55,8 +113,9 @@ Si necesitas añadir una dependencia porque la especificación la exige, comprue
 
 El backend del clasificador se elige con `LLM_PROVIDER` (`anthropic` por defecto). Las keys se leen del entorno según el backend:
 
-* `anthropic` (default): `ANTHROPIC_API_KEY` (+ `CLAUDE_MODEL`).
-* `openrouter` / `local`: `OPENAI_BASE_URL`, `OPENROUTER_API_KEY`, `LLM_MODEL` (usan el SDK `openai`, aún no en `requirements.txt`).
+* `openrouter` (**activo**) / `local`: `OPENAI_BASE_URL`, `OPENROUTER_API_KEY`, `LLM_MODEL` (SDK `openai`, **ya en `requirements.txt`**). Default `LLM_MODEL=google/gemini-3.1-flash-lite`.
+* `anthropic`: `ANTHROPIC_API_KEY` (+ `CLAUDE_MODEL`).
+* Enums/límites configurables: `TICKET_CATEGORIES`, `TICKET_PRIORITIES`, `TICKET_STATUSES`, `MAX_TAGS`, `MAX_TAG_LEN`, `FALLBACK_CATEGORY`, `FALLBACK_PRIORITY` (ver `app/config.py`).
 
 Otra variable: `DATABASE_URL` (ruta SQLite, formato `sqlite:///...`). Detalle completo en `SPEC.md` §4.
 
@@ -80,9 +139,12 @@ Campos mínimos:
 * `category`: str, uno de `bug`, `feature_request`, `question`, `urgent`.
 * `priority`: str, uno de `P1`, `P2`, `P3`.
 * `tags`: lista de strings, puede estar vacía. Máximo 5 tags, máximo 30 caracteres por tag.
-* `status`: str, uno de `open`, `in_progress`, `closed`. Default: `open`.
+* `assignees`: lista de responsables (varios), puede estar vacía. Se guarda como JSON (igual que `tags`).
+* `status`: str, uno de `open`, `in_progress`, `resolved`, `closed`. Default: `open`. Reabrir = volver a `open`.
 * `created_at`: datetime UTC generado en servidor.
 * `updated_at`: datetime UTC actualizado en cambios relevantes.
+* `status_changed_at`: datetime UTC; "desde cuándo está en ese estado" (se fija al crear, se actualiza al cambiar `status`).
+* `due_date`: fecha límite UTC calculada por prioridad (P1=hoy, P2=+1d, P3=+2d). "Vencido" = `due_date` pasada y status no terminal.
 
 Los enums son vinculantes. No devolver valores fuera de la lista ni variantes en mayúsculas como `"URGENT"`.
 
