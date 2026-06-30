@@ -275,14 +275,30 @@ HTML y reutilizan la misma lógica de crear/persistir/filtrar.
    `POST /tickets`) y devuelve el fragmento `_tickets_table.html` actualizado.
 2. **Tablero** que renderiza los tickets: `id`, `title`, `category` (con color
    por valor), `priority` (badge), `tags`, `status`, `created_at`.
-3. **Filtros**: tres `select` (categoría / prioridad / estado) que con
-   `hx-get` piden el fragmento `_tickets_table.html` filtrado y lo intercambian.
+3. **Filtros + buscador**: tres `select` (categoría / prioridad / estado) y un
+   campo de **búsqueda** (`q`, busca en `title`/`description`) que con `hx-get`
+   piden el fragmento filtrado y lo intercambian.
+4. **Paginación**: `PAGE_SIZE = 20` por página, con pie "Página X de Y · N
+   tickets" y botones Anterior/Siguiente.
+5. **Edición inline** (brief §4): cada fila lleva `select` de `status` y
+   `priority`; al cambiarlos se persiste con un `hx-post` y se refresca la tabla.
 
-Rutas de UI sugeridas (HTML, separadas del API JSON):
-- `GET /` → página completa (tabla inicial ya renderizada).
-- `GET /ui/tickets` → fragmento `_tickets_table.html` (con filtros por query).
+UX para Marta: en la primera carga el tablero muestra `status=open` por defecto
+(elegir "todos" envía `status=""`). El estado (filtros/búsqueda/página) se
+refleja en la URL (`hx-push-url`) para que **recargar no lo pierda**.
+
+Rutas de UI (HTML, separadas del API JSON):
+- `GET /` → página completa, ya filtrada/paginada según query params
+  (`category`, `priority`, `status`, `q`, `page`).
+- `GET /ui/tickets` → fragmento `_tickets_table.html` (filtros + `q` + `page`);
+  devuelve la página completa si la petición no es de HTMX (recarga directa).
 - `POST /ui/tickets` → crea ticket y devuelve el fragmento actualizado.
-- (opcional) actualización de estado/prioridad por fila vía HTMX.
+- `POST /ui/tickets/{id}` → edición inline de `status`/`priority` (campos
+  `new_status` / `new_priority`); valida con `TicketPatch` y devuelve el fragmento.
+
+La capa de datos (`db.list_tickets`) acepta `q`, `limit` y `offset` opcionales y
+`db.count_tickets` da el total; **sin `q`/`limit` el comportamiento es el
+histórico**, así que la API JSON `GET /tickets` y los tests no cambian.
 
 Reglas: Jinja2 para templates; nada de HTML grande dentro de `main.py`; sin
 React/Vue ni build tools. Diseño correcto y legible, no espectacular.

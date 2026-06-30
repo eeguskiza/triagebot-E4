@@ -23,8 +23,8 @@
             class="grid gap-3 sm:grid-cols-3">
         <input name="title" required maxlength="200" placeholder="Título"
                class="rounded-md border border-slate-300 px-3 py-2 text-sm sm:col-span-1">
-        <input name="description" required maxlength="5000" placeholder="Descripción"
-               class="rounded-md border border-slate-300 px-3 py-2 text-sm sm:col-span-2">
+        <textarea name="description" required maxlength="5000" rows="2" placeholder="Descripción"
+                  class="rounded-md border border-slate-300 px-3 py-2 text-sm sm:col-span-2"></textarea>
         <div class="sm:col-span-3">
           <button type="submit"
                   class="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700">
@@ -35,34 +35,38 @@
       </form>
     </section>
 
-    <!-- Filtros -->
+    <!-- Filtros + buscador -->
     <section class="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">
       <h2 class="mb-3 text-lg font-semibold">Filtros</h2>
       <div id="filters" class="flex flex-wrap gap-3">
+        <input name="q" value="{{ filters.q }}" placeholder="Buscar en título o descripción…"
+               hx-get="/ui/tickets" hx-target="#tickets-container" hx-swap="innerHTML"
+               hx-trigger="input changed delay:300ms, search" hx-include="#filters" hx-push-url="true"
+               class="min-w-[16rem] flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm">
         <select name="category" hx-get="/ui/tickets" hx-target="#tickets-container" hx-swap="innerHTML"
-                hx-trigger="change" hx-include="#filters"
+                hx-trigger="change" hx-include="#filters" hx-push-url="true"
                 class="rounded-md border border-slate-300 px-3 py-2 text-sm">
           <option value="">Categoría (todas)</option>
-          <option value="bug">bug</option>
-          <option value="feature_request">feature_request</option>
-          <option value="question">question</option>
-          <option value="urgent">urgent</option>
+          <option value="bug" {% if filters.category == "bug" %}selected{% endif %}>bug</option>
+          <option value="feature_request" {% if filters.category == "feature_request" %}selected{% endif %}>feature_request</option>
+          <option value="question" {% if filters.category == "question" %}selected{% endif %}>question</option>
+          <option value="urgent" {% if filters.category == "urgent" %}selected{% endif %}>urgent</option>
         </select>
         <select name="priority" hx-get="/ui/tickets" hx-target="#tickets-container" hx-swap="innerHTML"
-                hx-trigger="change" hx-include="#filters"
+                hx-trigger="change" hx-include="#filters" hx-push-url="true"
                 class="rounded-md border border-slate-300 px-3 py-2 text-sm">
           <option value="">Prioridad (todas)</option>
-          <option value="P1">P1</option>
-          <option value="P2">P2</option>
-          <option value="P3">P3</option>
+          <option value="P1" {% if filters.priority == "P1" %}selected{% endif %}>P1</option>
+          <option value="P2" {% if filters.priority == "P2" %}selected{% endif %}>P2</option>
+          <option value="P3" {% if filters.priority == "P3" %}selected{% endif %}>P3</option>
         </select>
         <select name="status" hx-get="/ui/tickets" hx-target="#tickets-container" hx-swap="innerHTML"
-                hx-trigger="change" hx-include="#filters"
+                hx-trigger="change" hx-include="#filters" hx-push-url="true"
                 class="rounded-md border border-slate-300 px-3 py-2 text-sm">
           <option value="">Estado (todos)</option>
-          <option value="open">open</option>
-          <option value="in_progress">in_progress</option>
-          <option value="closed">closed</option>
+          <option value="open" {% if filters.status == "open" %}selected{% endif %}>open</option>
+          <option value="in_progress" {% if filters.status == "in_progress" %}selected{% endif %}>in_progress</option>
+          <option value="closed" {% if filters.status == "closed" %}selected{% endif %}>closed</option>
         </select>
       </div>
     </section>

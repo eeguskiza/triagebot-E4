@@ -101,3 +101,84 @@ def test_ui_escapes_html_in_user_input_no_xss(client, monkeypatch):
     assert r.status_code == 200
     assert payload not in r.text                          # no aparece crudo
     assert "&lt;script&gt;" in r.text                     # aparece escapado
+
+
+# --------------------------------------------------------------------------- #
+# Buscador, paginación, edición inline y persistencia de estado
+# --------------------------------------------------------------------------- #
+HX = {"HX-Request": "true"}
+
+
+def test_ui_search_narrows_results(client, monkeypatch):
+    _mock_classifier(monkeypatch)
+    client.post("/ui/tickets", data={"title": "Error de login", "description": "no entro"})
+    client.post("/ui/tickets", data={"title": "Exportar PDF", "description": "informes"})
+
+    r = client.get("/ui/tickets", params={"q": "login"}, headers=HX)
+    assert "Error de login" in r.text
+    assert "Exportar PDF" not in r.text
+
+
+def test_ui_search_matches_description_too(client, monkeypatch):
+    _mock_classifier(monkeypatch)
+    client.post("/ui/tickets", data={"title": "Cosa", "description": "fallo en el checkout"})
+    r = client.get("/ui/tickets", params={"q": "checkout"}, headers=HX)
+    assert "Cosa" in r.text
+
+
+def test_ui_inline_edit_changes_status(client, monkeypatch):
+    _mock_classifier(monkeypatch)
+    tid = client.post("/tickets", json={"title": "Ticket", "description": "desc"}).json()["id"]
+    r = client.post(f"/ui/tickets/{tid}", data={"new_status": "closed"}, headers=HX)
+    assert r.status_code == 200
+    assert client.get(f"/tickets/{tid}").json()["status"] == "closed"
+
+
+def test_ui_inline_edit_changes_priority(client, monkeypatch):
+    _mock_classifier(monkeypatch, priority="P1")
+    tid = client.post("/tickets", json={"title": "Ticket", "description": "desc"}).json()["id"]
+    client.post(f"/ui/tickets/{tid}", data={"new_priority": "P3"}, headers=HX)
+    assert client.get(f"/tickets/{tid}").json()["priority"] == "P3"
+
+
+def test_index_defaults_to_open_status(client, monkeypatch):
+    # Crea 1 ticket y lo pasa a closed; GET / (sin params) muestra abiertos por
+    # defecto, así que el cerrado no debe aparecer.
+    _mock_classifier(monkeypatch)
+    tid = client.post("/tickets", json={"title": "Cerrado", "description": "x"}).json()["id"]
+    client.post(f"/ui/tickets/{tid}", data={"new_status": "closed"}, headers=HX)
+    assert "Cerrado" not in client.get("/").text                 # filtrado a open por defecto
+    assert "Cerrado" in client.get("/", params={"status": ""}).text  # "todos" lo muestra
+
+
+def test_index_preserves_filter_via_query(client, monkeypatch):
+    _mock_classifier(monkeypatch, category="urgent")
+    client.post("/tickets", json={"title": "Urgente", "description": "x"})
+    # GET / con filtro explícito por query → la página ya viene filtrada (estado al recargar).
+    assert "Urgente" in client.get("/", params={"category": "urgent", "status": ""}).text
+    assert "Urgente" not in client.get("/", params={"category": "bug", "status": ""}).text
+
+
+def test_ui_inline_edit_keeps_current_page(client, monkeypatch):
+    # Marta no debe perder su sitio: editar un ticket estando en la página 2
+    # devuelve la página 2 (no salta a la 1).
+    _mock_classifier(monkeypatch)
+    ids = [client.post("/tickets", json={"title": f"T{i}", "description": "x"}).json()["id"]
+           for i in range(23)]
+    r = client.post(
+        f"/ui/tickets/{ids[0]}",
+        data={"new_priority": "P2", "status": "", "page": 2},
+        headers=HX,
+    )
+    assert "Página 2 de 2" in r.text
+
+
+def test_ui_pagination_caps_page_size(client, monkeypatch):
+    _mock_classifier(monkeypatch)
+    for i in range(23):
+        client.post("/tickets", json={"title": f"T{i}", "description": "x"})
+    # Página 1: como máximo PAGE_SIZE (20) filas; hay un <select name="new_status"> por fila.
+    page1 = client.get("/ui/tickets", params={"status": ""}, headers=HX).text
+    assert page1.count('name="new_status"') == 20
+    page2 = client.get("/ui/tickets", params={"status": "", "page": 2}, headers=HX).text
+    assert page2.count('name="new_status"') == 3            # 23 - 20
