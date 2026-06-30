@@ -182,3 +182,27 @@ def test_ui_pagination_caps_page_size(client, monkeypatch):
     assert page1.count('name="new_status"') == 20
     page2 = client.get("/ui/tickets", params={"status": "", "page": 2}, headers=HX).text
     assert page2.count('name="new_status"') == 3            # 23 - 20
+
+
+def test_health_endpoint(client):
+    r = client.get("/health")
+    assert r.status_code == 200
+    assert r.json() == {"status": "ok"}
+
+
+def test_ui_inline_edit_invalid_status_is_ignored(client, monkeypatch):
+    # ValidationError silenciada: status inválido no cae el endpoint ni cambia el ticket.
+    _mock_classifier(monkeypatch)
+    tid = client.post("/tickets", json={"title": "T", "description": "d"}).json()["id"]
+    r = client.post(f"/ui/tickets/{tid}", data={"new_status": "INVALIDO"}, headers=HX)
+    assert r.status_code == 200
+    assert client.get(f"/tickets/{tid}").json()["status"] == "open"  # sin cambios
+
+
+def test_assignees_capped_at_ten(client, monkeypatch):
+    # _parse_assignees: si llegan 11 nombres, solo persisten los 10 primeros.
+    _mock_classifier(monkeypatch)
+    tid = client.post("/tickets", json={"title": "T", "description": "d"}).json()["id"]
+    eleven = ",".join(f"user{i}" for i in range(11))
+    client.post(f"/ui/tickets/{tid}", data={"new_assignees": eleven}, headers=HX)
+    assert len(client.get(f"/tickets/{tid}").json()["assignees"]) == 10
