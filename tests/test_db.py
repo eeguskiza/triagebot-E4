@@ -64,3 +64,13 @@ def test_search_combines_with_filters(tmp_db):
     # q + filtro category → AND
     res = db.list_tickets("urgent", None, None, q="login")
     assert [t["title"] for t in res] == ["Login caído"]
+
+
+def test_get_db_path_fallback_when_no_env(monkeypatch):
+    # Sin DATABASE_URL (o con formato incorrecto) → devuelve "triagebot.db".
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    from app.db import _get_db_path
+    assert _get_db_path() == "triagebot.db"
+
+    monkeypatch.setenv("DATABASE_URL", "postgres://localhost/foo")
+    assert _get_db_path() == "triagebot.db"
