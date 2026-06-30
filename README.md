@@ -56,13 +56,19 @@ git status
 
 `.env` **no debe aparecer**.
 
-## Ejecutar tests
+## Tests y CI
+
+Comandos locales (los mismos que ejecuta el CI):
 
 ```bash
-pytest -v
+ruff check .            # lint (config en pyproject.toml, line-length 100)
+pytest -v               # los 5 tests de aceptación
+pytest -v --cov=app     # tests + cobertura
 ```
 
-Al clonar el repo plantilla, los tests de aceptación deben fallar. Eso es lo esperado: todavía no habéis implementado TriageBot.
+El pipeline está en [`.github/workflows/ci.yml`](.github/workflows/ci.yml) y se ejecuta en cada **push** y **pull request** a `main` (Python 3.11, instala desde `requirements.txt`, corre `ruff` y `pytest --cov=app`). También puede lanzarse a mano desde la pestaña **Actions** (*Run workflow*).
+
+> **Nota (fork):** GitHub deshabilita Actions en los forks por defecto. La primera vez hay que habilitarlas en la pestaña **Actions** del repo → *"I understand my workflows, go ahead and enable them"*. Sin eso el CI no se ejecuta.
 
 ## Ejecutar la app
 
