@@ -21,6 +21,7 @@ import json
 import os
 import re
 
+from app import config
 from app.models import ALLOWED_CATEGORIES, ALLOWED_PRIORITIES
 
 # Carga .env si existe (no sobrescribe variables ya presentes en el entorno).
@@ -32,40 +33,50 @@ try:
 except Exception:  # pragma: no cover
     pass
 
-FALLBACK_CLASSIFICATION = {"category": "question", "priority": "P3", "tags": []}
+FALLBACK_CLASSIFICATION = {
+    "category": config.FALLBACK_CATEGORY,
+    "priority": config.FALLBACK_PRIORITY,
+    "tags": [],
+}
 
-MAX_TAGS = 5
-MAX_TAG_LEN = 30
 MAX_TOKENS = 512
 
 DEFAULT_OPENAI_BASE_URL = "https://openrouter.ai/api/v1"
 DEFAULT_LLM_MODEL = "google/gemini-3.1-flash-lite"
 DEFAULT_CLAUDE_MODEL = "claude-opus-4-8"
 
-SYSTEM_PROMPT = (
-    "Eres un sistema de triage de tickets de soporte. Dado el título y la "
-    "descripción de un ticket, clasifícalo y responde ÚNICAMENTE con un objeto "
-    "JSON válido, sin texto adicional ni markdown, con esta forma exacta:\n"
-    '{"category": "<bug|feature_request|question|urgent>", '
-    '"priority": "<P1|P2|P3>", "tags": ["etiqueta", "..."]}\n'
-    "Reglas:\n"
-    "- category debe ser EXACTAMENTE uno de: bug, feature_request, question, urgent.\n"
-    "- priority: P1 (urgente), P2 (importante), P3 (normal).\n"
-    "- tags: como máximo 5 etiquetas cortas en minúscula (máx. 30 caracteres "
-    "cada una). Puede ser una lista vacía.\n"
-    "- No añadas ningún otro campo ni texto fuera del JSON."
-)
 
-# Esquema para el tool-use forzado de Anthropic.
-CLASSIFY_TOOL_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "category": {"type": "string", "enum": sorted(ALLOWED_CATEGORIES)},
-        "priority": {"type": "string", "enum": sorted(ALLOWED_PRIORITIES)},
-        "tags": {"type": "array", "items": {"type": "string"}},
-    },
-    "required": ["category", "priority", "tags"],
-}
+def _build_system_prompt() -> str:
+    cats = " | ".join(config.CATEGORIES)
+    prios = " | ".join(config.PRIORITIES)
+    return (
+        "Eres un sistema de triage de tickets de soporte. Dado el título y la "
+        "descripción de un ticket, clasifícalo y responde ÚNICAMENTE con un objeto "
+        "JSON válido, sin texto adicional ni markdown, con esta forma exacta:\n"
+        f'{{"category": "<{cats}>", "priority": "<{prios}>", "tags": ["etiqueta", "..."]}}\n'
+        "Reglas:\n"
+        f"- category debe ser EXACTAMENTE uno de: {', '.join(config.CATEGORIES)}.\n"
+        f"- priority debe ser EXACTAMENTE uno de: {', '.join(config.PRIORITIES)}.\n"
+        f"- tags: como máximo {config.MAX_TAGS} etiquetas cortas en minúscula "
+        f"(máx. {config.MAX_TAG_LEN} caracteres cada una). Puede ser una lista vacía.\n"
+        "- No añadas ningún otro campo ni texto fuera del JSON."
+    )
+
+
+def _build_tool_schema() -> dict:
+    return {
+        "type": "object",
+        "properties": {
+            "category": {"type": "string", "enum": sorted(ALLOWED_CATEGORIES)},
+            "priority": {"type": "string", "enum": sorted(ALLOWED_PRIORITIES)},
+            "tags": {"type": "array", "items": {"type": "string"}},
+        },
+        "required": ["category", "priority", "tags"],
+    }
+
+
+SYSTEM_PROMPT = _build_system_prompt()
+CLASSIFY_TOOL_SCHEMA = _build_tool_schema()
 
 
 def _safe_fallback() -> dict:
@@ -209,16 +220,16 @@ def _validate(data: object) -> dict | None:
 
 
 def _normalize_tags(raw: object) -> list[str]:
-    """Lista de strings: minúscula, recortadas a 30 chars, máximo 5, sin vacíos."""
+    """Lista de strings: minúscula, recortadas a MAX_TAG_LEN chars, máximo MAX_TAGS, sin vacíos."""
     if not isinstance(raw, list):
         return []
     tags: list[str] = []
     for item in raw:
         if not isinstance(item, str):
             continue
-        tag = item.strip().lower()[:MAX_TAG_LEN]
+        tag = item.strip().lower()[:config.MAX_TAG_LEN]
         if tag:
             tags.append(tag)
-        if len(tags) >= MAX_TAGS:
+        if len(tags) >= config.MAX_TAGS:
             break
     return tags
