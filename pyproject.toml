@@ -15,3 +15,9 @@ ignore = []
 testpaths = ["tests"]
 pythonpath = ["."]
 addopts = "-ra"
+
+[tool.coverage.run]
+omit = ["app/seed.py"]
+
+[tool.coverage.report]
+fail_under = 65
