@@ -47,7 +47,7 @@ jobs:
         run: ruff check .
 
       - name: Tests + coverage
-        run: pytest -v --cov=app --cov-report=html --cov-report=json:htmlcov/coverage.json --junit-xml=htmlcov/junit.xml --benchmark-disable
+        run: pytest -v --cov=app --cov-report=html --cov-report=json:htmlcov/coverage.json --junit-xml=htmlcov/junit.xml
 
       - name: Upload coverage artifact
         if: always()
@@ -88,7 +88,7 @@ jobs:
           from datetime import datetime, timezone
 
           THRESHOLD = 65
-          CIRC = round(2 * math.pi * 40, 2)
+          CIRC = round(2 * math.pi * 52, 2)
           VERSIONS = ["3.11", "3.12"]
 
           def load_cov(path):
@@ -110,238 +110,164 @@ jobs:
                       "failures": failures, "errors": errors, "skipped": skipped, "cases": cases}
 
           def col(p):
-              return "#16a34a" if p>=80 else "#2563eb" if p>=THRESHOLD else "#ea580c" if p>=50 else "#dc2626"
+              return "#1b5e20" if p>=80 else "#2e7d32" if p>=THRESHOLD else "#e65100" if p>=50 else "#b71c1c"
 
           def donut(p, c):
-              r = 40; cx = 50; cy = 50; circ = round(2*math.pi*r, 2)
-              filled = round((p/100)*circ, 1); gap = round(circ-filled, 1)
-              return (f'<svg viewBox="0 0 100 100" width="100" height="100">'
-                      f'<circle cx="{cx}" cy="{cy}" r="{r}" fill="none" stroke="#f1f5f9" stroke-width="10"/>'
-                      f'<circle cx="{cx}" cy="{cy}" r="{r}" fill="none" stroke="{c}" stroke-width="10"'
-                      f' stroke-dasharray="{filled} {gap}" stroke-linecap="round"'
-                      f' transform="rotate(-90 {cx} {cy})"/>'
-                      f'<text x="{cx}" y="{cy+1}" text-anchor="middle" dominant-baseline="middle"'
-                      f' font-size="16" font-weight="700" fill="#1e293b" font-family="system-ui">{p}%</text>'
+              f = round((p/100)*CIRC,1); g = round(CIRC-f,1)
+              lbl = "PASS" if p>=THRESHOLD else "FAIL"
+              lc  = "#2e7d32" if p>=THRESHOLD else "#b71c1c"
+              return (f'<svg viewBox="0 0 120 120" width="130" height="130">'
+                      f'<circle cx="60" cy="60" r="52" fill="none" stroke="#e8ecf0" stroke-width="13"/>'
+                      f'<circle cx="60" cy="60" r="52" fill="none" stroke="{c}" stroke-width="13"'
+                      f' stroke-dasharray="{f} {g}" stroke-linecap="round" transform="rotate(-90 60 60)"/>'
+                      f'<text x="60" y="52" text-anchor="middle" font-size="20" font-weight="700" fill="{c}" font-family="system-ui">{p}%</text>'
+                      f'<text x="60" y="70" text-anchor="middle" font-size="10" font-weight="700" fill="{lc}" font-family="system-ui" letter-spacing="1">{lbl}</text>'
                       f'</svg>')
 
           def bar(p, c):
-              return (f'<div class="bar-wrap">'
-                      f'<div class="bar-track"><div class="bar-fill" style="width:{p:.0f}%;background:{c}"></div></div>'
-                      f'<span class="bar-label" style="color:{c}">{p:.0f}%</span>'
-                      f'</div>')
+              return (f'<div style="display:flex;align-items:center;gap:8px">'
+                      f'<div style="flex:1;background:#e8ecf0;border-radius:6px;height:8px">'
+                      f'<div style="width:{p:.0f}%;background:{c};height:8px;border-radius:6px"></div></div>'
+                      f'<span style="font-size:.8rem;font-weight:700;color:{c};min-width:34px;text-align:right">{p:.0f}%</span></div>')
 
-          cov    = {v: load_cov(  f"site/py{v.replace('.','')}/coverage.json") for v in VERSIONS}
-          junit  = {v: load_junit(f"site/py{v.replace('.','')}/junit.xml")     for v in VERSIONS}
-          totals = {v: round(cov[v]["totals"]["percent_covered"], 1) for v in VERSIONS}
+          cov   = {v: load_cov(  f"site/py{v.replace('.','')}/coverage.json") for v in VERSIONS}
+          junit = {v: load_junit(f"site/py{v.replace('.','')}/junit.xml")     for v in VERSIONS}
+          totals = {v: round(cov[v]["totals"]["percent_covered"],1) for v in VERSIONS}
 
-          # ── version cards ─────────────────────────────────────────────────
+          # ── summary cards ──────────────────────────────────────────────────
           cards = ""
           for v in VERSIONS:
-              p    = totals[v]; c = col(p); slug = v.replace(".","")
-              j    = junit[v];  t = cov[v]["totals"]
-              ok   = j["failures"] == 0 and j["errors"] == 0
-              badge_cls = "badge-ok" if ok else "badge-fail"
-              badge_txt = f'{j["passed"]}/{j["tests"]} passed' if ok else f'{j["failures"]} failing'
-              cards += (
-                  f'<div class="card">'
-                  f'  <div class="card-head">'
-                  f'    <span class="py-label">Python {v}</span>'
-                  f'    <span class="badge {badge_cls}">{badge_txt}</span>'
-                  f'  </div>'
-                  f'  <div class="card-body">'
-                  f'    <div class="donut-wrap">{donut(p,c)}</div>'
-                  f'    <div class="card-stats">'
-                  f'      <div class="stat-row"><span class="stat-val" style="color:{c}">{t["covered_lines"]}</span><span class="stat-lbl">líneas cubiertas</span></div>'
-                  f'      <div class="stat-row"><span class="stat-val text-muted">{t["missing_lines"]}</span><span class="stat-lbl">sin cubrir</span></div>'
-                  f'      <div class="stat-row"><span class="stat-val text-dim">{t["num_statements"]}</span><span class="stat-lbl">total</span></div>'
-                  f'    </div>'
-                  f'  </div>'
-                  f'  <a class="card-link" href="py{slug}/index.html">Ver informe detallado &rarr;</a>'
-                  f'</div>'
-              )
+              p = totals[v]; c = col(p); slug = v.replace(".","")
+              j = junit[v];  t = cov[v]["totals"]
+              ok      = j["failures"]==0 and j["errors"]==0
+              sbg     = "#e8f5e9" if ok else "#ffebee"
+              sc      = "#2e7d32" if ok else "#b71c1c"
+              stxt    = f'✅&nbsp;{j["passed"]}/{j["tests"]} tests OK' if ok else f'❌&nbsp;{j["failures"]} fallando'
+              cards += (f'<div class="card" style="border-top:5px solid {c}">'
+                        f'<div class="cv">Python {v}</div>'
+                        f'<div class="donut">{donut(p,c)}</div>'
+                        f'<div class="pill" style="background:{sbg};color:{sc}">{stxt}</div>'
+                        f'<div class="stats">'
+                        f'<div class="st"><b style="color:{c}">{t["covered_lines"]}</b><small>cubiertas</small></div>'
+                        f'<div class="st"><b style="color:#c62828">{t["missing_lines"]}</b><small>sin cubrir</small></div>'
+                        f'<div class="st"><b style="color:#555">{t["num_statements"]}</b><small>total</small></div>'
+                        f'</div>'
+                        f'<a class="btn" href="py{slug}/index.html" style="background:{c}">Informe completo →</a>'
+                        f'</div>')
 
-          # ── test accordions ───────────────────────────────────────────────
+          # ── test results table ─────────────────────────────────────────────
           all_cases = {}
           for v in VERSIONS:
               for tc in junit[v]["cases"]:
                   all_cases.setdefault(tc["name"], tc["classname"])
 
-          def get_status(name, v):
+          def icon(name, v):
               for tc in junit[v]["cases"]:
-                  if tc["name"] == name: return tc["status"]
-              return None
-
-          def status_chip(st):
-              if st == "pass":  return '<span class="chip chip-pass">pass</span>'
-              if st == "fail":  return '<span class="chip chip-fail">fail</span>'
-              if st == "skip":  return '<span class="chip chip-skip">skip</span>'
-              return '<span class="chip chip-none">—</span>'
+                  if tc["name"]==name:
+                      return {"pass":"✅","fail":"❌","skip":"⏭️"}[tc["status"]]
+              return "—"
 
           def readable(n):
-              return n.replace("test_","").replace("_"," ")
+              return n.replace("test_","").replace("_"," ").capitalize()
 
           grouped = {}
           for name, cls in all_cases.items():
-              mod = cls.split(".")[-1] if cls else "otros"
-              mod = mod.replace("test_","")
+              mod = cls.split(".")[-1].replace("test_","") if cls else "otros"
               grouped.setdefault(mod, []).append(name)
 
-          ver_headers = "".join(f'<th class="th-ver">Python {v}</th>' for v in VERSIONS)
-          accordions  = ""
+          test_rows = ""
           for mod in sorted(grouped):
-              names    = sorted(grouped[mod])
-              total_t  = len(names)
-              pass_min = min(
-                  sum(1 for n in names if get_status(n,v)=="pass")
-                  for v in VERSIONS
-              )
-              all_ok = pass_min == total_t
-              icon   = "✓" if all_ok else "✗"
-              icon_cls = "acc-icon-ok" if all_ok else "acc-icon-fail"
-              rows = ""
-              for name in names:
-                  chips = "".join(f'<td class="td-chip">{status_chip(get_status(name,v))}</td>' for v in VERSIONS)
-                  rows += f'<tr><td class="td-name">{readable(name)}</td>{chips}</tr>'
-              accordions += (
-                  f'<details class="accordion">'
-                  f'  <summary class="acc-summary">'
-                  f'    <span class="{icon_cls}">{icon}</span>'
-                  f'    <span class="acc-mod">{mod}</span>'
-                  f'    <span class="acc-count">{pass_min}/{total_t}</span>'
-                  f'  </summary>'
-                  f'  <table class="inner-table">'
-                  f'    <thead><tr><th class="th-name">Test</th>{ver_headers}</tr></thead>'
-                  f'    <tbody>{rows}</tbody>'
-                  f'  </table>'
-                  f'</details>'
-              )
+              first = True
+              for name in sorted(grouped[mod]):
+                  cells = "".join(f'<td class="ic">{icon(name,v)}</td>' for v in VERSIONS)
+                  tag   = f'<span class="mod">{mod}</span>' if first else '<span class="mod" style="opacity:0">{mod}</span>'
+                  test_rows += f'<tr><td class="tn">{tag}{readable(name)}</td>{cells}</tr>'
+                  first = False
 
-          # ── module coverage accordion ─────────────────────────────────────
+          # ── module coverage ────────────────────────────────────────────────
           all_files = sorted(set(cov["3.11"]["files"]) | set(cov["3.12"]["files"]))
-          cov_rows  = ""
+          mod_rows = ""
           for f in all_files:
-              fname = f.replace("app/", "")
-              cells = f'<td class="td-file"><code>{fname}</code></td>'
+              name = f.replace("app/","")
+              row  = f'<td><code>{name}</code></td>'
               for v in VERSIONS:
                   if f in cov[v]["files"]:
                       p = round(cov[v]["files"][f]["summary"]["percent_covered"])
-                      cells += f'<td class="td-bar">{bar(p, col(p))}</td>'
+                      row += f"<td>{bar(p,col(p))}</td>"
                   else:
-                      cells += '<td class="td-bar text-dim">—</td>'
-              cov_rows += f'<tr>{cells}</tr>'
+                      row += "<td style='color:#ccc'>—</td>"
+              mod_rows += f"<tr>{row}</tr>"
 
-          cov_ver_headers = "".join(f'<th class="th-ver">Python {v}</th>' for v in VERSIONS)
-
-          now = datetime.now(timezone.utc).strftime("%d %b %Y · %H:%M UTC")
+          ver_ths = "".join(f"<th>Python {v}</th>" for v in VERSIONS)
+          now = datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M UTC")
 
           html = f"""<!DOCTYPE html>
           <html lang="es">
           <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width,initial-scale=1">
-            <title>TriageBot CI</title>
+            <title>TriageBot · CI Dashboard</title>
             <style>
-              *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
-              :root {{
-                --bg:      #f8fafc;
-                --surface: #ffffff;
-                --border:  #e2e8f0;
-                --text:    #1e293b;
-                --muted:   #64748b;
-                --dim:     #94a3b8;
-                --radius:  10px;
-                --shadow:  0 1px 4px rgba(0,0,0,.07), 0 4px 16px rgba(0,0,0,.05);
-              }}
-              body {{ font-family: "Inter", system-ui, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.6; }}
-              /* ── header ── */
-              header {{ background: #0f172a; color: #f8fafc; padding: 40px 24px 36px; text-align: center; }}
-              .header-title {{ font-size: 1.5rem; font-weight: 700; letter-spacing: -.02em; }}
-              .header-meta  {{ margin-top: 6px; font-size: .8rem; color: #94a3b8; }}
-              /* ── layout ── */
-              main {{ max-width: 860px; margin: 0 auto; padding: 36px 20px 60px; }}
-              .section {{ margin-bottom: 40px; }}
-              .section-title {{ font-size: .7rem; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; color: var(--dim); margin-bottom: 14px; }}
-              /* ── cards ── */
-              .cards {{ display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }}
-              .card {{ background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); }}
-              .card-head {{ display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }}
-              .py-label  {{ font-size: .8rem; font-weight: 600; color: var(--muted); }}
-              .badge {{ font-size: .72rem; font-weight: 600; padding: 3px 10px; border-radius: 20px; }}
-              .badge-ok   {{ background: #dcfce7; color: #15803d; }}
-              .badge-fail {{ background: #fee2e2; color: #b91c1c; }}
-              .card-body {{ display: flex; align-items: center; gap: 20px; margin-bottom: 18px; }}
-              .donut-wrap {{ flex-shrink: 0; }}
-              .card-stats {{ flex: 1; display: flex; flex-direction: column; gap: 10px; }}
-              .stat-row   {{ display: flex; align-items: baseline; gap: 8px; }}
-              .stat-val   {{ font-size: 1.25rem; font-weight: 700; line-height: 1; }}
-              .stat-lbl   {{ font-size: .75rem; color: var(--muted); }}
-              .text-muted {{ color: #dc2626; }}
-              .text-dim   {{ color: var(--dim); }}
-              .card-link  {{ display: block; text-align: center; padding: 9px; border: 1px solid var(--border); border-radius: 7px; font-size: .8rem; font-weight: 600; color: var(--muted); text-decoration: none; transition: background .15s; }}
-              .card-link:hover {{ background: var(--bg); color: var(--text); }}
-              /* ── accordions ── */
-              .accordion {{ border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); margin-bottom: 8px; box-shadow: var(--shadow); overflow: hidden; }}
-              .acc-summary {{ list-style: none; display: flex; align-items: center; gap: 12px; padding: 13px 18px; cursor: pointer; user-select: none; }}
-              .acc-summary::-webkit-details-marker {{ display: none; }}
-              .acc-summary::before {{ content: "›"; font-size: 1.1rem; color: var(--dim); transition: transform .2s; margin-right: 2px; }}
-              details[open] .acc-summary::before {{ transform: rotate(90deg); }}
-              .acc-icon-ok   {{ font-size: .75rem; font-weight: 700; color: #16a34a; background: #dcfce7; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }}
-              .acc-icon-fail {{ font-size: .75rem; font-weight: 700; color: #dc2626; background: #fee2e2; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }}
-              .acc-mod   {{ font-size: .85rem; font-weight: 600; color: var(--text); flex: 1; }}
-              .acc-count {{ font-size: .75rem; color: var(--muted); font-variant-numeric: tabular-nums; }}
-              .inner-table {{ width: 100%; border-collapse: collapse; }}
-              .inner-table thead {{ background: #f8fafc; }}
-              .th-name, .th-ver {{ font-size: .7rem; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--dim); padding: 8px 18px; text-align: left; border-top: 1px solid var(--border); }}
-              .th-ver {{ text-align: center; width: 100px; }}
-              .td-name {{ padding: 9px 18px; font-size: .84rem; color: var(--text); border-top: 1px solid #f1f5f9; }}
-              .td-chip {{ padding: 9px 18px; text-align: center; border-top: 1px solid #f1f5f9; }}
-              .chip {{ display: inline-block; font-size: .7rem; font-weight: 600; padding: 2px 9px; border-radius: 4px; text-transform: uppercase; letter-spacing: .04em; }}
-              .chip-pass {{ background: #dcfce7; color: #15803d; }}
-              .chip-fail {{ background: #fee2e2; color: #b91c1c; }}
-              .chip-skip {{ background: #fef9c3; color: #854d0e; }}
-              .chip-none {{ background: #f1f5f9; color: var(--dim); }}
-              /* ── coverage bars ── */
-              .cov-table {{ width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); border-collapse: collapse; box-shadow: var(--shadow); overflow: hidden; }}
-              .td-file {{ padding: 10px 18px; font-size: .84rem; border-top: 1px solid #f1f5f9; white-space: nowrap; }}
-              .td-bar  {{ padding: 10px 18px; border-top: 1px solid #f1f5f9; min-width: 140px; }}
-              .bar-wrap  {{ display: flex; align-items: center; gap: 8px; }}
-              .bar-track {{ flex: 1; background: #f1f5f9; border-radius: 4px; height: 6px; }}
-              .bar-fill  {{ height: 6px; border-radius: 4px; }}
-              .bar-label {{ font-size: .78rem; font-weight: 600; min-width: 32px; text-align: right; }}
-              code {{ font-family: ui-monospace, monospace; font-size: .82rem; color: #334155; }}
-              /* ── footer ── */
-              footer {{ text-align: center; padding: 24px; font-size: .75rem; color: var(--dim); border-top: 1px solid var(--border); }}
-              @media (max-width: 600px) {{ .cards {{ grid-template-columns: 1fr; }} }}
+              *{{box-sizing:border-box;margin:0;padding:0}}
+              body{{font-family:system-ui,sans-serif;background:#f0f4f8;color:#1a1a2e;min-height:100vh}}
+              header{{background:linear-gradient(135deg,#0d1b2a 0%,#1b2a3b 60%,#1565c0 100%);
+                      color:#fff;padding:36px 24px 30px;text-align:center}}
+              header h1{{font-size:1.9rem;font-weight:800;letter-spacing:-.02em}}
+              header p{{margin-top:8px;opacity:.65;font-size:.85rem}}
+              main{{max-width:920px;margin:0 auto;padding:32px 20px 48px}}
+              h2{{font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;
+                  color:#94a3b8;margin-bottom:14px;margin-top:32px}}
+              .cards{{display:grid;grid-template-columns:1fr 1fr;gap:20px}}
+              .card{{background:#fff;border-radius:14px;padding:24px 20px 22px;text-align:center;
+                     box-shadow:0 2px 12px #00000012}}
+              .cv{{font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#94a3b8;margin-bottom:6px}}
+              .donut{{display:flex;justify-content:center;margin:2px 0 10px}}
+              .pill{{display:inline-block;padding:5px 14px;border-radius:20px;font-size:.82rem;
+                     font-weight:700;margin-bottom:14px}}
+              .stats{{display:flex;justify-content:center;gap:24px;margin-bottom:18px}}
+              .st{{display:flex;flex-direction:column;align-items:center;gap:2px}}
+              .st b{{font-size:1.3rem;font-weight:800}}
+              .st small{{font-size:.68rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em}}
+              .btn{{display:inline-block;padding:9px 20px;border-radius:8px;color:#fff;
+                    font-weight:700;font-size:.84rem;text-decoration:none}}
+              .btn:hover{{filter:brightness(1.1)}}
+              table{{width:100%;background:#fff;border-radius:12px;border-collapse:collapse;
+                     box-shadow:0 2px 12px #00000012;overflow:hidden}}
+              th{{background:#f8fafc;font-size:.72rem;font-weight:700;text-transform:uppercase;
+                  letter-spacing:.07em;color:#94a3b8;padding:11px 16px;border-bottom:1px solid #e2e8f0}}
+              td{{padding:10px 16px;border-bottom:1px solid #f1f5f9;font-size:.88rem}}
+              tr:last-child td{{border-bottom:none}}
+              tr:hover td{{background:#fafcff}}
+              .tn{{color:#334155;max-width:420px}}
+              .ic{{text-align:center;font-size:1rem;width:80px}}
+              .mod{{display:inline-block;font-size:.68rem;font-weight:700;text-transform:uppercase;
+                    letter-spacing:.07em;color:#94a3b8;background:#f1f5f9;border-radius:4px;
+                    padding:1px 6px;margin-right:8px;min-width:80px;text-align:center}}
+              code{{font-family:ui-monospace,monospace;font-size:.85rem;color:#1565c0}}
+              footer{{text-align:center;padding:24px 0;font-size:.78rem;color:#cbd5e1}}
+              @media(max-width:580px){{.cards{{grid-template-columns:1fr}}}}
             </style>
           </head>
           <body>
             <header>
-              <div class="header-title">TriageBot &mdash; CI Dashboard</div>
-              <div class="header-meta">Última ejecución: {now} &nbsp;&middot;&nbsp; Umbral de cobertura: {THRESHOLD}%</div>
+              <h1>🤖 TriageBot · CI Dashboard</h1>
+              <p>Actualizado el {now} &nbsp;·&nbsp; Umbral de cobertura: {THRESHOLD}% &nbsp;·&nbsp; <code style="opacity:.75">app/seed.py</code> excluido</p>
             </header>
             <main>
-              <div class="section">
-                <div class="section-title">Resumen por versión de Python</div>
-                <div class="cards">{cards}</div>
-              </div>
+              <h2>Cobertura por versión</h2>
+              <div class="cards">{cards}</div>
 
-              <div class="section">
-                <div class="section-title">Resultados de tests &mdash; {len(all_cases)} tests en total</div>
-                {accordions}
-              </div>
+              <h2>Resultados de tests ({len(all_cases)} en total)</h2>
+              <table>
+                <thead><tr><th>Test</th>{ver_ths}</tr></thead>
+                <tbody>{test_rows}</tbody>
+              </table>
 
-              <div class="section">
-                <div class="section-title">Cobertura por módulo</div>
-                <table class="cov-table">
-                  <thead>
-                    <tr>
-                      <th class="th-name" style="border-top:none">Módulo</th>
-                      {cov_ver_headers.replace('th-ver','th-ver" style="border-top:none')}
-                    </tr>
-                  </thead>
-                  <tbody>{cov_rows}</tbody>
-                </table>
-              </div>
+              <h2>Cobertura por módulo</h2>
+              <table>
+                <thead><tr><th>Módulo</th>{ver_ths}</tr></thead>
+                <tbody>{mod_rows}</tbody>
+              </table>
             </main>
             <footer>Generado automáticamente en cada push a <code>main</code></footer>
           </body>
