@@ -166,6 +166,24 @@ def count_tickets(
         return conn.execute("SELECT COUNT(*) FROM tickets" + clause, params).fetchone()[0]
 
 
+def get_ticket_stats() -> dict:
+    from app import config
+    by_cat  = {c: 0 for c in config.CATEGORIES}
+    by_prio = {p: 0 for p in config.PRIORITIES}
+    by_stat = {s: 0 for s in config.STATUSES}
+    total   = 0
+    with get_connection() as conn:
+        for row in conn.execute("SELECT category, priority, status FROM tickets"):
+            total += 1
+            if row["category"] in by_cat:
+                by_cat[row["category"]] += 1
+            if row["priority"] in by_prio:
+                by_prio[row["priority"]] += 1
+            if row["status"] in by_stat:
+                by_stat[row["status"]] += 1
+    return {"total": total, "by_category": by_cat, "by_priority": by_prio, "by_status": by_stat}
+
+
 def get_ticket(ticket_id: int) -> dict | None:
     with get_connection() as conn:
         row = conn.execute("SELECT * FROM tickets WHERE id = ?", (ticket_id,)).fetchone()
