@@ -5,6 +5,16 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+
+# Mínimo privilegio: el job solo lee el repo y corre los checks.
+permissions:
+  contents: read
+
+# Cancela runs en curso de la misma rama/PR cuando llega uno nuevo.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:

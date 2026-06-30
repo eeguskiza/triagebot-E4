@@ -7,8 +7,9 @@ select = ["E", "F", "I", "UP", "B"]
 ignore = []
 
 [tool.ruff.lint.per-file-ignores]
-# Los tests de aceptación no se modifican (regla del taller); ignoramos solo E501 ahí.
-"tests/test_acceptance.py" = ["E501"]
+# Los tests no se reformatean por longitud de línea (los aporta el equipo y no se
+# modifican por estilo): ignoramos solo E501 en todo tests/. El resto de reglas sigue.
+"tests/*.py" = ["E501"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
