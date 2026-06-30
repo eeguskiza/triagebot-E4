@@ -39,7 +39,7 @@ MAX_TAG_LEN = 30
 MAX_TOKENS = 512
 
 DEFAULT_OPENAI_BASE_URL = "https://openrouter.ai/api/v1"
-DEFAULT_LLM_MODEL = "openai/gpt-oss-120b"
+DEFAULT_LLM_MODEL = "google/gemini-3.1-flash-lite"
 DEFAULT_CLAUDE_MODEL = "claude-opus-4-8"
 
 SYSTEM_PROMPT = (
