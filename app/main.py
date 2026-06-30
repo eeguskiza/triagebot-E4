@@ -85,10 +85,60 @@ def patch_ticket(ticket_id: int, body: TicketPatch):
 # --------------------------------------------------------------------------- #
 # UI HTMX (HTML; rutas separadas de la API JSON)
 # --------------------------------------------------------------------------- #
+PAGE_SIZE = 20
+
+
+def _render_board(
+    request: Request,
+    category: str | None,
+    priority: str | None,
+    status: str | None,
+    q: str | None,
+    page: int,
+    *,
+    full_page: bool,
+):
+    """Renderiza el tablero (página completa o solo el fragmento de tabla) con
+    filtros + búsqueda + paginación. Lógica compartida por todas las rutas UI."""
+    total = db.count_tickets(category, priority, status, q)
+    pages = max((total + PAGE_SIZE - 1) // PAGE_SIZE, 1)
+    page = min(max(page, 1), pages)
+    tickets = db.list_tickets(
+        category, priority, status, q, limit=PAGE_SIZE, offset=(page - 1) * PAGE_SIZE
+    )
+    context = {
+        "tickets": tickets,
+        "filters": {
+            "category": category or "",
+            "priority": priority or "",
+            "status": status or "",
+            "q": q or "",
+        },
+        "page": page,
+        "pages": pages,
+        "total": total,
+        "page_size": PAGE_SIZE,
+    }
+    template = "index.html" if full_page else "_tickets_table.html"
+    return templates.TemplateResponse(request, template, context)
+
+
 @app.get("/", response_class=HTMLResponse)
-def index(request: Request):
-    tickets = db.list_tickets(None, None, None)
-    return templates.TemplateResponse(request, "index.html", {"tickets": tickets})
+def index(
+    request: Request,
+    category: str | None = None,
+    priority: str | None = None,
+    status: str | None = None,
+    q: str | None = None,
+    page: int = 1,
+):
+    # UX para Marta: en la primera carga (sin parámetro `status`) mostramos
+    # los abiertos. Elegir "Estado (todos)" envía status="" → muestra todo.
+    effective_status = "open" if status is None else (status or None)
+    return _render_board(
+        request, category or None, priority or None, effective_status, q or None,
+        page, full_page=True,
+    )
 
 
 @app.get("/ui/tickets", response_class=HTMLResponse)
@@ -97,10 +147,16 @@ def ui_list_tickets(
     category: str | None = None,
     priority: str | None = None,
     status: str | None = None,
+    q: str | None = None,
+    page: int = 1,
 ):
-    # Los <select> envían "" para "todas"; lo tratamos como sin filtro.
-    tickets = db.list_tickets(category or None, priority or None, status or None)
-    return templates.TemplateResponse(request, "_tickets_table.html", {"tickets": tickets})
+    # Si la petición no viene de HTMX (recarga del navegador sobre la URL
+    # pusheada), devolvemos la página completa para no perder el formulario.
+    is_htmx = request.headers.get("HX-Request") == "true"
+    return _render_board(
+        request, category or None, priority or None, status or None, q or None,
+        page, full_page=not is_htmx,
+    )
 
 
 @app.post("/ui/tickets", response_class=HTMLResponse)
@@ -111,6 +167,7 @@ def ui_create_ticket(
     category: str = Form(""),
     priority: str = Form(""),
     status: str = Form(""),
+    q: str = Form(""),
 ):
     # Reutilizamos la validación de TicketCreate (strip + longitudes). Si la
     # entrada es inválida no creamos nada y devolvemos la tabla tal cual.
@@ -120,7 +177,36 @@ def ui_create_ticket(
     except ValidationError:
         pass
 
-    # Respetamos los filtros activos (el form los envía vía hx-include) para que
-    # la tabla devuelta sea coherente con lo que el usuario está viendo.
-    tickets = db.list_tickets(category or None, priority or None, status or None)
-    return templates.TemplateResponse(request, "_tickets_table.html", {"tickets": tickets})
+    # Respetamos los filtros/búsqueda activos (el form los envía vía hx-include).
+    return _render_board(
+        request, category or None, priority or None, status or None, q or None,
+        page=1, full_page=False,
+    )
+
+
+@app.post("/ui/tickets/{ticket_id}", response_class=HTMLResponse)
+def ui_update_ticket(
+    request: Request,
+    ticket_id: int,
+    new_status: str = Form(""),
+    new_priority: str = Form(""),
+    category: str = Form(""),
+    priority: str = Form(""),
+    status: str = Form(""),
+    q: str = Form(""),
+    page: int = Form(1),
+):
+    # Edición inline desde el tablero (Marta §4). Solo cambia el campo enviado;
+    # valida enums con TicketPatch y persiste con db.update_ticket (sin duplicar).
+    try:
+        patch = TicketPatch(status=new_status or None, priority=new_priority or None)
+        db.update_ticket(ticket_id, patch.model_dump(exclude_none=True))
+    except ValidationError:
+        pass
+
+    # Mantenemos la página actual (Marta no pierde su sitio al editar); _render_board
+    # la reajusta si al cambiar el ticket la página deja de existir.
+    return _render_board(
+        request, category or None, priority or None, status or None, q or None,
+        page=page, full_page=False,
+    )

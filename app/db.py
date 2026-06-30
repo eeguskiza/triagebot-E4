@@ -66,22 +66,60 @@ def create_ticket(data: dict) -> dict:
     return _row_to_dict(row)
 
 
-def list_tickets(category: str | None, priority: str | None, status: str | None) -> list[dict]:
-    query = "SELECT * FROM tickets WHERE 1=1"
+def _where(category: str | None, priority: str | None,
+           status: str | None, q: str | None) -> tuple[str, list]:
+    """Construye el WHERE dinámico (filtros AND + búsqueda) y sus parámetros."""
+    clause = " WHERE 1=1"
     params: list = []
     if category:
-        query += " AND category = ?"
+        clause += " AND category = ?"
         params.append(category)
     if priority:
-        query += " AND priority = ?"
+        clause += " AND priority = ?"
         params.append(priority)
     if status:
-        query += " AND status = ?"
+        clause += " AND status = ?"
         params.append(status)
-    query += " ORDER BY created_at DESC, id DESC"
+    if q:
+        clause += " AND (title LIKE ? OR description LIKE ?)"
+        like = f"%{q}%"
+        params.extend([like, like])
+    return clause, params
+
+
+def list_tickets(
+    category: str | None,
+    priority: str | None,
+    status: str | None,
+    q: str | None = None,
+    limit: int | None = None,
+    offset: int = 0,
+) -> list[dict]:
+    """Lista tickets con filtros AND, búsqueda opcional y paginación opcional.
+
+    Sin `q` ni `limit` devuelve todos los que cumplen los filtros (comportamiento
+    histórico que usan la API JSON y los tests).
+    """
+    clause, params = _where(category, priority, status, q)
+    query = "SELECT * FROM tickets" + clause + " ORDER BY created_at DESC, id DESC"
+    if limit is not None:
+        query += " LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
     with get_connection() as conn:
         rows = conn.execute(query, params).fetchall()
     return [_row_to_dict(r) for r in rows]
+
+
+def count_tickets(
+    category: str | None,
+    priority: str | None,
+    status: str | None,
+    q: str | None = None,
+) -> int:
+    """Cuenta los tickets que cumplen los filtros/búsqueda (para paginación)."""
+    clause, params = _where(category, priority, status, q)
+    with get_connection() as conn:
+        return conn.execute("SELECT COUNT(*) FROM tickets" + clause, params).fetchone()[0]
 
 
 def get_ticket(ticket_id: int) -> dict | None:
