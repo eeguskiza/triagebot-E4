@@ -22,6 +22,18 @@ def _safe_fallback() -> dict:
     return {**FALLBACK_CLASSIFICATION, "tags": list(FALLBACK_CLASSIFICATION["tags"])}
 
 
+def _parse_assignees(raw: str) -> list[str]:
+    """Convierte 'ana, luis' en ['ana', 'luis'] (responsables; máx. 10, 60 chars)."""
+    names: list[str] = []
+    for part in raw.split(","):
+        name = part.strip()[:60]
+        if name:
+            names.append(name)
+        if len(names) >= 10:
+            break
+    return names
+
+
 def _classify_and_create(title: str, description: str) -> dict:
     """Clasifica (con fallback seguro) y persiste un ticket. Lógica compartida
     por la API JSON (`POST /tickets`) y la UI HTMX (`POST /ui/tickets`)."""
@@ -62,8 +74,9 @@ def list_tickets(
     category: str | None = None,
     priority: str | None = None,
     status: str | None = None,
+    assignee: str | None = None,
 ):
-    return db.list_tickets(category, priority, status)
+    return db.list_tickets(category, priority, status, assignee=assignee)
 
 
 @app.get("/tickets/{ticket_id}")
@@ -96,15 +109,17 @@ def _render_board(
     q: str | None,
     page: int,
     *,
+    assignee: str | None = None,
     full_page: bool,
 ):
     """Renderiza el tablero (página completa o solo el fragmento de tabla) con
-    filtros + búsqueda + paginación. Lógica compartida por todas las rutas UI."""
-    total = db.count_tickets(category, priority, status, q)
+    filtros + búsqueda + responsable + paginación. Compartida por las rutas UI."""
+    total = db.count_tickets(category, priority, status, q, assignee)
     pages = max((total + PAGE_SIZE - 1) // PAGE_SIZE, 1)
     page = min(max(page, 1), pages)
     tickets = db.list_tickets(
-        category, priority, status, q, limit=PAGE_SIZE, offset=(page - 1) * PAGE_SIZE
+        category, priority, status, q,
+        limit=PAGE_SIZE, offset=(page - 1) * PAGE_SIZE, assignee=assignee,
     )
     context = {
         "tickets": tickets,
@@ -113,6 +128,7 @@ def _render_board(
             "priority": priority or "",
             "status": status or "",
             "q": q or "",
+            "assignee": assignee or "",
         },
         "page": page,
         "pages": pages,
@@ -130,6 +146,7 @@ def index(
     priority: str | None = None,
     status: str | None = None,
     q: str | None = None,
+    assignee: str | None = None,
     page: int = 1,
 ):
     # UX para Marta: en la primera carga (sin parámetro `status`) mostramos
@@ -137,7 +154,7 @@ def index(
     effective_status = "open" if status is None else (status or None)
     return _render_board(
         request, category or None, priority or None, effective_status, q or None,
-        page, full_page=True,
+        page, assignee=assignee or None, full_page=True,
     )
 
 
@@ -148,6 +165,7 @@ def ui_list_tickets(
     priority: str | None = None,
     status: str | None = None,
     q: str | None = None,
+    assignee: str | None = None,
     page: int = 1,
 ):
     # Si la petición no viene de HTMX (recarga del navegador sobre la URL
@@ -155,7 +173,7 @@ def ui_list_tickets(
     is_htmx = request.headers.get("HX-Request") == "true"
     return _render_board(
         request, category or None, priority or None, status or None, q or None,
-        page, full_page=not is_htmx,
+        page, assignee=assignee or None, full_page=not is_htmx,
     )
 
 
@@ -168,6 +186,7 @@ def ui_create_ticket(
     priority: str = Form(""),
     status: str = Form(""),
     q: str = Form(""),
+    assignee: str = Form(""),
 ):
     # Reutilizamos la validación de TicketCreate (strip + longitudes). Si la
     # entrada es inválida no creamos nada y devolvemos la tabla tal cual.
@@ -180,7 +199,7 @@ def ui_create_ticket(
     # Respetamos los filtros/búsqueda activos (el form los envía vía hx-include).
     return _render_board(
         request, category or None, priority or None, status or None, q or None,
-        page=1, full_page=False,
+        page=1, assignee=assignee or None, full_page=False,
     )
 
 
@@ -190,17 +209,23 @@ def ui_update_ticket(
     ticket_id: int,
     new_status: str = Form(""),
     new_priority: str = Form(""),
+    new_assignees: str | None = Form(None),
     category: str = Form(""),
     priority: str = Form(""),
     status: str = Form(""),
     q: str = Form(""),
+    assignee: str = Form(""),
     page: int = Form(1),
 ):
-    # Edición inline desde el tablero (Marta §4). Solo cambia el campo enviado;
-    # valida enums con TicketPatch y persiste con db.update_ticket (sin duplicar).
+    # Edición inline desde el tablero: status/priority (ciclo de vida, reabrir) y
+    # responsables. Solo cambia el campo enviado; valida enums con TicketPatch.
     try:
         patch = TicketPatch(status=new_status or None, priority=new_priority or None)
-        db.update_ticket(ticket_id, patch.model_dump(exclude_none=True))
+        update = patch.model_dump(exclude_none=True)
+        if new_assignees is not None:  # "" => limpiar responsables
+            update["assignees"] = _parse_assignees(new_assignees)
+        if update:
+            db.update_ticket(ticket_id, update)
     except ValidationError:
         pass
 
@@ -208,5 +233,5 @@ def ui_update_ticket(
     # la reajusta si al cambiar el ticket la página deja de existir.
     return _render_board(
         request, category or None, priority or None, status or None, q or None,
-        page=page, full_page=False,
+        page=page, assignee=assignee or None, full_page=False,
     )
