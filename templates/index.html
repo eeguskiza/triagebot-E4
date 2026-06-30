@@ -78,8 +78,13 @@
           <option value="">Estado (todos)</option>
           <option value="open" {% if filters.status == "open" %}selected{% endif %}>open</option>
           <option value="in_progress" {% if filters.status == "in_progress" %}selected{% endif %}>in_progress</option>
+          <option value="resolved" {% if filters.status == "resolved" %}selected{% endif %}>resolved</option>
           <option value="closed" {% if filters.status == "closed" %}selected{% endif %}>closed</option>
         </select>
+        <input name="assignee" value="{{ filters.assignee }}" placeholder="Responsable…"
+               hx-get="/ui/tickets" hx-target="#tickets-container" hx-swap="innerHTML"
+               hx-trigger="input changed delay:300ms, search" hx-include="#filters" hx-push-url="true"
+               class="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
         <label class="flex items-center gap-2 cursor-pointer select-none rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50">
           <input type="checkbox" name="overdue" value="true"
                  {% if filters.overdue %}checked{% endif %}

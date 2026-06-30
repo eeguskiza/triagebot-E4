@@ -126,9 +126,11 @@ Una sola entidad: **Ticket**.
 | `category` | str | `bug` \| `feature_request` \| `question` \| `urgent` |
 | `priority` | str | `P1` \| `P2` \| `P3` |
 | `tags` | list[str] | Lista (puede estar vacía). Recomendado: máx. 5 tags, máx. 30 chars c/u, en minúscula |
-| `status` | str | `open` \| `in_progress` \| `closed`. Default `open` |
+| `assignees` | list[str] | Responsables del ticket (varios). Lista, puede estar vacía. Se guarda como JSON, como `tags` |
+| `status` | str | `open` \| `in_progress` \| `resolved` \| `closed`. Default `open`. Reabrir = volver a `open` |
 | `created_at` | datetime | UTC, generado en servidor. Serializa a ISO 8601 (string) en la respuesta |
 | `updated_at` | datetime | UTC; se actualiza en cambios (PATCH) |
+| `status_changed_at` | datetime | UTC; "desde cuándo está en este estado". Se fija al crear y se actualiza cuando cambia `status` |
 
 `category`, `priority` y `tags` los rellena el clasificador al crear el ticket.
 **Los enums son vinculantes y case-sensitive** (`urgent`, no `URGENT`; `P1`, no

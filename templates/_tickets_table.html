@@ -22,6 +22,7 @@
 {% set status_select = {
   "open":        "bg-gray-100 text-gray-600",
   "in_progress": "bg-indigo-50 text-indigo-700",
+  "resolved":    "bg-emerald-50 text-emerald-700",
   "closed":      "bg-green-50 text-green-700"
 } %}
 
@@ -34,6 +35,7 @@
         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Categoría</th>
         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Prioridad</th>
         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Tags</th>
+        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Responsables</th>
         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Estado</th>
         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Creado</th>
         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Fecha límite</th>
@@ -41,8 +43,8 @@
     </thead>
     <tbody class="divide-y divide-gray-50">
       {% for t in tickets %}
-      {% set is_overdue = t.due_date and t.due_date < now_iso and t.status not in ('closed',) %}
-      <tr class="hover:bg-gray-50 transition-colors {% if is_overdue %}bg-red-50{% endif %}">
+      {% set is_overdue = t.due_date and t.due_date < now_iso and t.status not in ('closed', 'resolved') %}
+      <tr class="hover:bg-gray-50 transition-colors {% if is_overdue or t.priority == 'P1' %}bg-red-50{% endif %}">
         <td class="px-4 py-3 text-xs text-gray-400 tabular-nums">{{ t.id }}</td>
         <td class="px-4 py-3 text-sm font-medium text-gray-800 max-w-xs truncate">{{ t.title }}</td>
         <td class="px-4 py-3">
@@ -68,14 +70,32 @@
           </div>
         </td>
         <td class="px-4 py-3">
+          {% if t.assignees %}
+          <div class="mb-1 flex flex-wrap gap-1">
+            {% for a in t.assignees %}
+            <span class="inline-block rounded-full bg-indigo-50 px-1.5 py-0.5 text-xs text-indigo-700 font-medium">{{ a }}</span>
+            {% endfor %}
+          </div>
+          {% endif %}
+          <input name="new_assignees" value="{{ t.assignees | join(', ') }}"
+                 aria-label="Responsables del ticket {{ t.id }}" placeholder="ana, luis…"
+                 hx-post="/ui/tickets/{{ t.id }}" hx-target="#tickets-container" hx-swap="innerHTML"
+                 hx-trigger="change" hx-include="#filters" hx-vals='{"page": {{ page }}}'
+                 class="w-36 rounded-md border border-gray-200 px-2 py-0.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400">
+        </td>
+        <td class="px-4 py-3">
           <select name="new_status" aria-label="Estado del ticket {{ t.id }}"
                   hx-post="/ui/tickets/{{ t.id }}" hx-target="#tickets-container" hx-swap="innerHTML"
                   hx-trigger="change" hx-include="#filters" hx-vals='{"page": {{ page }}}'
                   class="cursor-pointer rounded-md border-0 px-2 py-0.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-400 {{ status_select.get(t.status, 'bg-gray-100 text-gray-600') }}">
             <option value="open" {% if t.status == "open" %}selected{% endif %}>open</option>
             <option value="in_progress" {% if t.status == "in_progress" %}selected{% endif %}>in_progress</option>
+            <option value="resolved" {% if t.status == "resolved" %}selected{% endif %}>resolved</option>
             <option value="closed" {% if t.status == "closed" %}selected{% endif %}>closed</option>
           </select>
+          <div class="mt-0.5 text-[10px] text-gray-400 whitespace-nowrap">
+            desde {{ t.status_changed_at[:16].replace("T", " ") if t.status_changed_at else "—" }}
+          </div>
         </td>
         <td class="px-4 py-3 text-xs text-gray-400 tabular-nums whitespace-nowrap">
           {{ t.created_at[:16].replace("T", " ") }}
@@ -96,7 +116,7 @@
       </tr>
       {% else %}
       <tr>
-        <td colspan="8" class="px-4 py-10 text-center text-sm text-gray-400">
+        <td colspan="9" class="px-4 py-10 text-center text-sm text-gray-400">
           No hay tickets que coincidan con los filtros.
         </td>
       </tr>
