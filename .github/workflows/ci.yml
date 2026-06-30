@@ -175,38 +175,53 @@ jobs:
               for tc in junit[v]["cases"]:
                   all_cases.setdefault(tc["name"], tc["cls"])
 
-          def get_st(name, v):
-              for tc in junit[v]["cases"]:
-                  if tc["name"] == name: return tc["st"]
-              return None
+          import re
 
-          def chip(st):
-              if st == "pass": return '<span class="chip pass">pass</span>'
-              if st == "fail": return '<span class="chip fail">fail</span>'
-              if st == "skip": return '<span class="chip skip">skip</span>'
-              return '<span class="chip none">—</span>'
+          def base_name(n):
+              # strip parametrize suffix [...]
+              return re.sub(r'\[.*\]$', '', n)
 
           def human(n):
-              return n.replace("test_","").replace("_"," ")
+              return base_name(n).replace("test_","").replace("_"," ")
 
+          def get_sts(raw_name, v):
+              # returns list of statuses for all variants of a base name
+              sts = [tc["st"] for tc in junit[v]["cases"] if base_name(tc["name"]) == raw_name]
+              return sts if sts else [None]
+
+          def agg_chip(sts):
+              if any(s == "fail" for s in sts): return '<span class="chip fail">fail</span>'
+              if all(s == "pass" for s in sts):
+                  n = len(sts)
+                  extra = f' <span class="chip-count">×{n}</span>' if n > 1 else ''
+                  return f'<span class="chip pass">pass</span>{extra}'
+              if all(s == "skip" for s in sts): return '<span class="chip skip">skip</span>'
+              return '<span class="chip none">—</span>'
+
+          # group by module, deduplicate base names
           grouped: dict = {}
           for name, cls in all_cases.items():
-              mod = cls.split(".")[-1].replace("test_","") if cls else "otros"
-              grouped.setdefault(mod, []).append(name)
+              mod      = cls.split(".")[-1].replace("test_","") if cls else "otros"
+              base     = base_name(name)
+              mod_dict = grouped.setdefault(mod, {})
+              mod_dict[base] = name  # last raw name wins, we only need base
 
           col_heads = "".join(f'<th class="th-c">py{v}</th>' for v in VERSIONS)
           accordions = ""
           for mod in sorted(grouped):
-              names   = sorted(grouped[mod])
-              pass_counts = [sum(1 for n in names if get_st(n,v)=="pass") for v in VERSIONS]
+              bases   = sorted(grouped[mod].keys())
+              # worst-case pass count across versions (using aggregated result)
+              def all_pass(base, v):
+                  return all(s == "pass" for s in get_sts(base, v))
+              pass_counts = [sum(1 for b in bases if all_pass(b,v)) for v in VERSIONS]
               worst   = min(pass_counts)
-              total_n = len(names)
+              total_n = len(bases)
               ok_mod  = worst == total_n
               dot_cls = "dot-ok" if ok_mod else "dot-fail"
               rows = ""
-              for name in names:
-                  chips = "".join(f'<td class="td-c">{chip(get_st(name,v))}</td>' for v in VERSIONS)
-                  rows += f'<tr><td class="td-n">{human(name)}</td>{chips}</tr>'
+              for base in bases:
+                  chips = "".join(f'<td class="td-c">{agg_chip(get_sts(base,v))}</td>' for v in VERSIONS)
+                  rows += f'<tr><td class="td-n">{human(base)}</td>{chips}</tr>'
               accordions += (
                   f'<details class="acc">'
                   f'<summary class="acc-sum">'
@@ -357,6 +372,7 @@ jobs:
               .chip.fail {{ background: #fee2e2; color: #b91c1c; }}
               .chip.skip {{ background: #fef9c3; color: #92400e; }}
               .chip.none {{ background: #f3f4f6; color: #9ca3af; }}
+              .chip-count {{ font-size: .65rem; color: #9ca3af; font-weight: 500; }}
 
               /* COVERAGE TABLE */
               .cov-table {{
