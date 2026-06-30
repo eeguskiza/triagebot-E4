@@ -15,8 +15,13 @@ def _get_db_path() -> str:
 
 
 def get_connection() -> sqlite3.Connection:
-    conn = sqlite3.connect(_get_db_path())
+    conn = sqlite3.connect(_get_db_path(), timeout=5.0)
     conn.row_factory = sqlite3.Row
+    # Concurrencia: WAL permite lectores en paralelo con un escritor; busy_timeout
+    # hace que una escritura espere al lock (hasta 5 s) en vez de fallar con
+    # "database is locked" bajo POSTs concurrentes.
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=5000")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS tickets (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
