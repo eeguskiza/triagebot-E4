@@ -38,11 +38,13 @@
         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Responsables</th>
         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Estado</th>
         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Creado</th>
+        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Fecha límite</th>
       </tr>
     </thead>
     <tbody class="divide-y divide-gray-50">
       {% for t in tickets %}
-      <tr class="hover:bg-gray-50 transition-colors">
+      {% set is_overdue = t.due_date and t.due_date < now_iso and t.status not in ('closed', 'resolved') %}
+      <tr class="hover:bg-gray-50 transition-colors {% if is_overdue or t.priority == 'P1' %}bg-red-50{% endif %}">
         <td class="px-4 py-3 text-xs text-gray-400 tabular-nums">{{ t.id }}</td>
         <td class="px-4 py-3 text-sm font-medium text-gray-800 max-w-xs truncate">{{ t.title }}</td>
         <td class="px-4 py-3">
@@ -98,10 +100,23 @@
         <td class="px-4 py-3 text-xs text-gray-400 tabular-nums whitespace-nowrap">
           {{ t.created_at[:16].replace("T", " ") }}
         </td>
+        <td class="px-4 py-3 text-xs tabular-nums whitespace-nowrap">
+          {% if t.due_date %}
+            {% if is_overdue %}
+              <span class="inline-flex items-center gap-1 rounded-md bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700 ring-1 ring-red-200">
+                VENCIDO · {{ t.due_date[:10] }}
+              </span>
+            {% else %}
+              <span class="text-gray-400">{{ t.due_date[:10] }}</span>
+            {% endif %}
+          {% else %}
+            <span class="text-gray-300">—</span>
+          {% endif %}
+        </td>
       </tr>
       {% else %}
       <tr>
-        <td colspan="8" class="px-4 py-10 text-center text-sm text-gray-400">
+        <td colspan="9" class="px-4 py-10 text-center text-sm text-gray-400">
           No hay tickets que coincidan con los filtros.
         </td>
       </tr>

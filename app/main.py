@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi import FastAPI, Form, HTTPException, Request
@@ -75,8 +76,9 @@ def list_tickets(
     priority: str | None = None,
     status: str | None = None,
     assignee: str | None = None,
+    overdue: bool = False,
 ):
-    return db.list_tickets(category, priority, status, assignee=assignee)
+    return db.list_tickets(category, priority, status, assignee=assignee, overdue=overdue)
 
 
 @app.get("/tickets/{ticket_id}")
@@ -110,16 +112,17 @@ def _render_board(
     page: int,
     *,
     assignee: str | None = None,
+    overdue: bool = False,
     full_page: bool,
 ):
     """Renderiza el tablero (página completa o solo el fragmento de tabla) con
-    filtros + búsqueda + responsable + paginación. Compartida por las rutas UI."""
-    total = db.count_tickets(category, priority, status, q, assignee)
+    filtros + búsqueda + responsable + vencidos + paginación. Compartida por las rutas UI."""
+    total = db.count_tickets(category, priority, status, q, assignee, overdue)
     pages = max((total + PAGE_SIZE - 1) // PAGE_SIZE, 1)
     page = min(max(page, 1), pages)
     tickets = db.list_tickets(
         category, priority, status, q,
-        limit=PAGE_SIZE, offset=(page - 1) * PAGE_SIZE, assignee=assignee,
+        limit=PAGE_SIZE, offset=(page - 1) * PAGE_SIZE, assignee=assignee, overdue=overdue,
     )
     context = {
         "tickets": tickets,
@@ -129,7 +132,9 @@ def _render_board(
             "status": status or "",
             "q": q or "",
             "assignee": assignee or "",
+            "overdue": overdue,
         },
+        "now_iso": datetime.now(UTC).isoformat(),
         "page": page,
         "pages": pages,
         "total": total,
@@ -148,13 +153,14 @@ def index(
     q: str | None = None,
     assignee: str | None = None,
     page: int = 1,
+    overdue: bool = False,
 ):
-    # UX para Marta: en la primera carga (sin parámetro `status`) mostramos
-    # los abiertos. Elegir "Estado (todos)" envía status="" → muestra todo.
-    effective_status = "open" if status is None else (status or None)
+    # UX para Marta: en la primera carga (sin parámetro `status` y sin filtrar
+    # vencidos) mostramos los abiertos. Elegir "Estado (todos)" envía status="".
+    effective_status = "open" if (status is None and not overdue) else (status or None)
     return _render_board(
         request, category or None, priority or None, effective_status, q or None,
-        page, assignee=assignee or None, full_page=True,
+        page, assignee=assignee or None, overdue=overdue, full_page=True,
     )
 
 
@@ -167,13 +173,14 @@ def ui_list_tickets(
     q: str | None = None,
     assignee: str | None = None,
     page: int = 1,
+    overdue: bool = False,
 ):
     # Si la petición no viene de HTMX (recarga del navegador sobre la URL
     # pusheada), devolvemos la página completa para no perder el formulario.
     is_htmx = request.headers.get("HX-Request") == "true"
     return _render_board(
         request, category or None, priority or None, status or None, q or None,
-        page, assignee=assignee or None, full_page=not is_htmx,
+        page, assignee=assignee or None, overdue=overdue, full_page=not is_htmx,
     )
 
 
@@ -187,6 +194,7 @@ def ui_create_ticket(
     status: str = Form(""),
     q: str = Form(""),
     assignee: str = Form(""),
+    overdue: str = Form(""),
 ):
     # Reutilizamos la validación de TicketCreate (strip + longitudes). Si la
     # entrada es inválida no creamos nada y devolvemos la tabla tal cual.
@@ -199,7 +207,7 @@ def ui_create_ticket(
     # Respetamos los filtros/búsqueda activos (el form los envía vía hx-include).
     return _render_board(
         request, category or None, priority or None, status or None, q or None,
-        page=1, assignee=assignee or None, full_page=False,
+        page=1, assignee=assignee or None, overdue=overdue == "true", full_page=False,
     )
 
 
@@ -216,6 +224,7 @@ def ui_update_ticket(
     q: str = Form(""),
     assignee: str = Form(""),
     page: int = Form(1),
+    overdue: str = Form(""),
 ):
     # Edición inline desde el tablero: status/priority (ciclo de vida, reabrir) y
     # responsables. Solo cambia el campo enviado; valida enums con TicketPatch.
@@ -233,5 +242,5 @@ def ui_update_ticket(
     # la reajusta si al cambiar el ticket la página deja de existir.
     return _render_board(
         request, category or None, priority or None, status or None, q or None,
-        page=page, assignee=assignee or None, full_page=False,
+        page=page, assignee=assignee or None, overdue=overdue == "true", full_page=False,
     )
