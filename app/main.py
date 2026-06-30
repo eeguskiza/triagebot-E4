@@ -81,6 +81,11 @@ def list_tickets(
     return db.list_tickets(category, priority, status, assignee=assignee, overdue=overdue)
 
 
+@app.get("/tickets/stats")
+def ticket_stats():
+    return db.get_ticket_stats()
+
+
 @app.get("/tickets/{ticket_id}")
 def get_ticket(ticket_id: int):
     ticket = db.get_ticket(ticket_id)
