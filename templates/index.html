@@ -4,48 +4,60 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>TriageBot</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    .htmx-indicator { display: none; }
+    .htmx-request .htmx-indicator { display: inline; }
+  </style>
 </head>
-<body class="bg-slate-50 text-slate-900">
-  <main class="mx-auto max-w-6xl p-6 space-y-6">
-    <header>
-      <h1 class="text-3xl font-bold">TriageBot</h1>
-      <p class="mt-1 text-slate-600">Tablero de incidencias con clasificación automática por IA.</p>
-    </header>
+<body class="bg-gray-50 text-gray-900 min-h-screen">
 
-    <!-- Formulario de creación -->
-    <section class="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">
-      <h2 class="mb-3 text-lg font-semibold">Nuevo ticket</h2>
+  <!-- Nav — misma estética que el CI Dashboard -->
+  <nav class="bg-slate-900 border-b border-slate-800 h-13 flex items-center justify-between px-6 py-3">
+    <span class="text-sm font-bold text-white tracking-tight">
+      Triage<span class="text-indigo-400">Bot</span>
+    </span>
+    <span class="text-xs text-slate-400">Tablero de incidencias · clasificación automática por IA</span>
+  </nav>
+
+  <main class="mx-auto max-w-6xl px-5 py-8 space-y-6">
+
+    <!-- Formulario -->
+    <section class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+      <p class="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-4">Nuevo ticket</p>
       <form hx-post="/ui/tickets" hx-target="#tickets-container" hx-swap="innerHTML"
             hx-include="#filters"
             hx-on::after-request="if(event.detail.successful) this.reset()"
             class="grid gap-3 sm:grid-cols-3">
-        <input name="title" required maxlength="200" placeholder="Título"
-               class="rounded-md border border-slate-300 px-3 py-2 text-sm sm:col-span-1">
-        <textarea name="description" required maxlength="5000" rows="2" placeholder="Descripción"
-                  class="rounded-md border border-slate-300 px-3 py-2 text-sm sm:col-span-2"></textarea>
-        <div class="sm:col-span-3">
+        <input name="title" required maxlength="200" placeholder="Título del ticket"
+               class="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 sm:col-span-1">
+        <textarea name="description" required maxlength="5000" rows="2" placeholder="Descripción detallada…"
+                  class="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 sm:col-span-2 resize-none"></textarea>
+        <div class="sm:col-span-3 flex items-center gap-3">
           <button type="submit"
-                  class="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700">
+                  class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 transition-colors">
             Crear ticket
           </button>
-          <span class="htmx-indicator ml-2 text-sm text-slate-500">Clasificando…</span>
+          <span class="htmx-indicator text-xs text-gray-400">Clasificando…</span>
         </div>
       </form>
     </section>
 
-    <!-- Filtros + buscador -->
-    <section class="rounded-lg bg-white p-4 shadow-sm ring-1 ring-slate-200">
-      <h2 class="mb-3 text-lg font-semibold">Filtros</h2>
+    <!-- Filtros -->
+    <section class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+      <p class="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-4">Filtros</p>
       <div id="filters" class="flex flex-wrap gap-3">
         <input name="q" value="{{ filters.q }}" placeholder="Buscar en título o descripción…"
                hx-get="/ui/tickets" hx-target="#tickets-container" hx-swap="innerHTML"
                hx-trigger="input changed delay:300ms, search" hx-include="#filters" hx-push-url="true"
-               class="min-w-[16rem] flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm">
+               class="min-w-[16rem] flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
         <select name="category" hx-get="/ui/tickets" hx-target="#tickets-container" hx-swap="innerHTML"
                 hx-trigger="change" hx-include="#filters" hx-push-url="true"
-                class="rounded-md border border-slate-300 px-3 py-2 text-sm">
+                class="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-400">
           <option value="">Categoría (todas)</option>
           <option value="bug" {% if filters.category == "bug" %}selected{% endif %}>bug</option>
           <option value="feature_request" {% if filters.category == "feature_request" %}selected{% endif %}>feature_request</option>
@@ -54,7 +66,7 @@
         </select>
         <select name="priority" hx-get="/ui/tickets" hx-target="#tickets-container" hx-swap="innerHTML"
                 hx-trigger="change" hx-include="#filters" hx-push-url="true"
-                class="rounded-md border border-slate-300 px-3 py-2 text-sm">
+                class="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-400">
           <option value="">Prioridad (todas)</option>
           <option value="P1" {% if filters.priority == "P1" %}selected{% endif %}>P1</option>
           <option value="P2" {% if filters.priority == "P2" %}selected{% endif %}>P2</option>
@@ -62,7 +74,7 @@
         </select>
         <select name="status" hx-get="/ui/tickets" hx-target="#tickets-container" hx-swap="innerHTML"
                 hx-trigger="change" hx-include="#filters" hx-push-url="true"
-                class="rounded-md border border-slate-300 px-3 py-2 text-sm">
+                class="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-400">
           <option value="">Estado (todos)</option>
           <option value="open" {% if filters.status == "open" %}selected{% endif %}>open</option>
           <option value="in_progress" {% if filters.status == "in_progress" %}selected{% endif %}>in_progress</option>
@@ -75,6 +87,7 @@
     <section id="tickets-container">
       {% include "_tickets_table.html" %}
     </section>
+
   </main>
 </body>
 </html>

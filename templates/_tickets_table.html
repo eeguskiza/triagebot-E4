@@ -1,85 +1,106 @@
 {% set cat_colors = {
-  "bug": "bg-red-100 text-red-800",
-  "feature_request": "bg-blue-100 text-blue-800",
-  "question": "bg-slate-100 text-slate-800",
-  "urgent": "bg-orange-100 text-orange-800"
+  "bug":             "bg-red-50 text-red-700 ring-1 ring-red-200",
+  "feature_request": "bg-blue-50 text-blue-700 ring-1 ring-blue-200",
+  "question":        "bg-gray-100 text-gray-600 ring-1 ring-gray-200",
+  "urgent":          "bg-orange-50 text-orange-700 ring-1 ring-orange-200"
 } %}
 {% set prio_colors = {
-  "P1": "bg-red-600 text-white",
-  "P2": "bg-amber-500 text-white",
-  "P3": "bg-emerald-600 text-white"
+  "P1": "bg-red-50 text-red-700 ring-1 ring-red-200",
+  "P2": "bg-amber-50 text-amber-700 ring-1 ring-amber-200",
+  "P3": "bg-gray-100 text-gray-500 ring-1 ring-gray-200"
+} %}
+{% set prio_select = {
+  "P1": "bg-red-50 text-red-700",
+  "P2": "bg-amber-50 text-amber-700",
+  "P3": "bg-gray-100 text-gray-500"
 } %}
 {% set status_colors = {
-  "open": "bg-slate-100 text-slate-700",
-  "in_progress": "bg-indigo-100 text-indigo-800",
-  "closed": "bg-green-100 text-green-800"
+  "open":        "bg-gray-100 text-gray-600 ring-1 ring-gray-200",
+  "in_progress": "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200",
+  "closed":      "bg-green-50 text-green-700 ring-1 ring-green-200"
 } %}
-<table class="min-w-full divide-y divide-slate-200 bg-white shadow-sm ring-1 ring-slate-200 rounded-lg overflow-hidden">
-  <thead class="bg-slate-100">
-    <tr>
-      <th class="px-3 py-2 text-left text-sm font-semibold">ID</th>
-      <th class="px-3 py-2 text-left text-sm font-semibold">Título</th>
-      <th class="px-3 py-2 text-left text-sm font-semibold">Categoría</th>
-      <th class="px-3 py-2 text-left text-sm font-semibold">Prioridad</th>
-      <th class="px-3 py-2 text-left text-sm font-semibold">Tags</th>
-      <th class="px-3 py-2 text-left text-sm font-semibold">Estado</th>
-      <th class="px-3 py-2 text-left text-sm font-semibold">Creado</th>
-    </tr>
-  </thead>
-  <tbody id="tickets-table-body">
-    {% for t in tickets %}
-    <tr class="border-t border-slate-100 hover:bg-slate-50 {% if t.priority == 'P1' %}bg-red-50{% endif %}">
-      <td class="px-3 py-2 text-sm text-slate-500">{{ t.id }}</td>
-      <td class="px-3 py-2 text-sm font-medium">{{ t.title }}</td>
-      <td class="px-3 py-2 text-sm">
-        <span class="rounded-full px-2 py-0.5 text-xs font-medium {{ cat_colors.get(t.category, 'bg-slate-100 text-slate-800') }}">{{ t.category }}</span>
-      </td>
-      <td class="px-3 py-2 text-sm">
-        <select name="new_priority" aria-label="Prioridad del ticket {{ t.id }}"
-                hx-post="/ui/tickets/{{ t.id }}" hx-target="#tickets-container" hx-swap="innerHTML"
-                hx-trigger="change" hx-include="#filters" hx-vals='{"page": {{ page }}}'
-                class="cursor-pointer rounded border-0 px-2 py-0.5 text-xs font-semibold {{ prio_colors.get(t.priority, 'bg-slate-200 text-slate-800') }}">
-          <option value="P1" {% if t.priority == "P1" %}selected{% endif %}>P1</option>
-          <option value="P2" {% if t.priority == "P2" %}selected{% endif %}>P2</option>
-          <option value="P3" {% if t.priority == "P3" %}selected{% endif %}>P3</option>
-        </select>
-      </td>
-      <td class="px-3 py-2 text-sm">
-        {% for tag in t.tags %}
-        <span class="mr-1 inline-block rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600">{{ tag }}</span>
-        {% endfor %}
-      </td>
-      <td class="px-3 py-2 text-sm">
-        <select name="new_status" aria-label="Estado del ticket {{ t.id }}"
-                hx-post="/ui/tickets/{{ t.id }}" hx-target="#tickets-container" hx-swap="innerHTML"
-                hx-trigger="change" hx-include="#filters" hx-vals='{"page": {{ page }}}'
-                class="cursor-pointer rounded-full border-0 px-2 py-0.5 text-xs font-medium {{ status_colors.get(t.status, 'bg-slate-100 text-slate-700') }}">
-          <option value="open" {% if t.status == "open" %}selected{% endif %}>open</option>
-          <option value="in_progress" {% if t.status == "in_progress" %}selected{% endif %}>in_progress</option>
-          <option value="closed" {% if t.status == "closed" %}selected{% endif %}>closed</option>
-        </select>
-      </td>
-      <td class="px-3 py-2 text-xs text-slate-500">{{ t.created_at[:16].replace("T", " ") }}</td>
-    </tr>
-    {% else %}
-    <tr>
-      <td colspan="7" class="px-3 py-6 text-center text-sm text-slate-400">No hay tickets que coincidan.</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+{% set status_select = {
+  "open":        "bg-gray-100 text-gray-600",
+  "in_progress": "bg-indigo-50 text-indigo-700",
+  "closed":      "bg-green-50 text-green-700"
+} %}
+
+<div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+  <table class="min-w-full divide-y divide-gray-100">
+    <thead>
+      <tr class="bg-gray-50">
+        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400 w-12">#</th>
+        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Título</th>
+        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Categoría</th>
+        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Prioridad</th>
+        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Tags</th>
+        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Estado</th>
+        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Creado</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-50">
+      {% for t in tickets %}
+      <tr class="hover:bg-gray-50 transition-colors">
+        <td class="px-4 py-3 text-xs text-gray-400 tabular-nums">{{ t.id }}</td>
+        <td class="px-4 py-3 text-sm font-medium text-gray-800 max-w-xs truncate">{{ t.title }}</td>
+        <td class="px-4 py-3">
+          <span class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium {{ cat_colors.get(t.category, 'bg-gray-100 text-gray-600') }}">
+            {{ t.category }}
+          </span>
+        </td>
+        <td class="px-4 py-3">
+          <select name="new_priority" aria-label="Prioridad del ticket {{ t.id }}"
+                  hx-post="/ui/tickets/{{ t.id }}" hx-target="#tickets-container" hx-swap="innerHTML"
+                  hx-trigger="change" hx-include="#filters" hx-vals='{"page": {{ page }}}'
+                  class="cursor-pointer rounded-md border-0 px-2 py-0.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-400 {{ prio_select.get(t.priority, 'bg-gray-100 text-gray-500') }}">
+            <option value="P1" {% if t.priority == "P1" %}selected{% endif %}>P1</option>
+            <option value="P2" {% if t.priority == "P2" %}selected{% endif %}>P2</option>
+            <option value="P3" {% if t.priority == "P3" %}selected{% endif %}>P3</option>
+          </select>
+        </td>
+        <td class="px-4 py-3">
+          <div class="flex flex-wrap gap-1">
+            {% for tag in t.tags %}
+            <span class="inline-block rounded-md bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500 font-medium">{{ tag }}</span>
+            {% endfor %}
+          </div>
+        </td>
+        <td class="px-4 py-3">
+          <select name="new_status" aria-label="Estado del ticket {{ t.id }}"
+                  hx-post="/ui/tickets/{{ t.id }}" hx-target="#tickets-container" hx-swap="innerHTML"
+                  hx-trigger="change" hx-include="#filters" hx-vals='{"page": {{ page }}}'
+                  class="cursor-pointer rounded-md border-0 px-2 py-0.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-400 {{ status_select.get(t.status, 'bg-gray-100 text-gray-600') }}">
+            <option value="open" {% if t.status == "open" %}selected{% endif %}>open</option>
+            <option value="in_progress" {% if t.status == "in_progress" %}selected{% endif %}>in_progress</option>
+            <option value="closed" {% if t.status == "closed" %}selected{% endif %}>closed</option>
+          </select>
+        </td>
+        <td class="px-4 py-3 text-xs text-gray-400 tabular-nums whitespace-nowrap">
+          {{ t.created_at[:16].replace("T", " ") }}
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="7" class="px-4 py-10 text-center text-sm text-gray-400">
+          No hay tickets que coincidan con los filtros.
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
 
 <!-- Paginación -->
-<div class="mt-3 flex items-center justify-between text-sm text-slate-600">
+<div class="mt-3 flex items-center justify-between text-xs text-gray-500 px-1">
   <span>{{ total }} ticket{{ "s" if total != 1 else "" }} · Página {{ page }} de {{ pages }}</span>
   <div class="flex gap-2">
     <button hx-get="/ui/tickets" hx-vals='{"page": {{ page - 1 }}}' hx-include="#filters"
             hx-target="#tickets-container" hx-swap="innerHTML" hx-push-url="true"
-            class="rounded-md border border-slate-300 px-3 py-1 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100"
+            class="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             {% if page <= 1 %}disabled{% endif %}>‹ Anterior</button>
     <button hx-get="/ui/tickets" hx-vals='{"page": {{ page + 1 }}}' hx-include="#filters"
             hx-target="#tickets-container" hx-swap="innerHTML" hx-push-url="true"
-            class="rounded-md border border-slate-300 px-3 py-1 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100"
+            class="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             {% if page >= pages %}disabled{% endif %}>Siguiente ›</button>
   </div>
 </div>
