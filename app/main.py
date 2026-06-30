@@ -88,9 +88,7 @@ def patch_ticket(ticket_id: int, body: TicketPatch):
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
     tickets = db.list_tickets(None, None, None)
-    return templates.TemplateResponse(
-        "index.html", {"request": request, "tickets": tickets}
-    )
+    return templates.TemplateResponse(request, "index.html", {"tickets": tickets})
 
 
 @app.get("/ui/tickets", response_class=HTMLResponse)
@@ -102,9 +100,7 @@ def ui_list_tickets(
 ):
     # Los <select> envían "" para "todas"; lo tratamos como sin filtro.
     tickets = db.list_tickets(category or None, priority or None, status or None)
-    return templates.TemplateResponse(
-        "_tickets_table.html", {"request": request, "tickets": tickets}
-    )
+    return templates.TemplateResponse(request, "_tickets_table.html", {"tickets": tickets})
 
 
 @app.post("/ui/tickets", response_class=HTMLResponse)
@@ -127,6 +123,4 @@ def ui_create_ticket(
     # Respetamos los filtros activos (el form los envía vía hx-include) para que
     # la tabla devuelta sea coherente con lo que el usuario está viendo.
     tickets = db.list_tickets(category or None, priority or None, status or None)
-    return templates.TemplateResponse(
-        "_tickets_table.html", {"request": request, "tickets": tickets}
-    )
+    return templates.TemplateResponse(request, "_tickets_table.html", {"tickets": tickets})
