@@ -7,7 +7,7 @@ from pydantic import ValidationError
 
 from app import classifier, db
 from app.classifier import FALLBACK_CLASSIFICATION
-from app.models import TicketCreate, TicketPatch
+from app.models import ALLOWED_CATEGORIES, ALLOWED_PRIORITIES, TicketCreate, TicketPatch
 
 app = FastAPI(title="TriageBot")
 
@@ -27,6 +27,9 @@ def _classify_and_create(title: str, description: str) -> dict:
     por la API JSON (`POST /tickets`) y la UI HTMX (`POST /ui/tickets`)."""
     try:
         classification = classifier.classify_ticket(title, description)
+        if (classification.get("category") not in ALLOWED_CATEGORIES or
+                classification.get("priority") not in ALLOWED_PRIORITIES):
+            classification = _safe_fallback()
     except Exception:
         classification = _safe_fallback()
 
