@@ -1,8 +1,10 @@
 from pydantic import BaseModel, field_validator
 
-ALLOWED_CATEGORIES = {"bug", "feature_request", "question", "urgent"}
-ALLOWED_PRIORITIES = {"P1", "P2", "P3"}
-ALLOWED_STATUSES = {"open", "in_progress", "closed"}
+from app import config
+
+ALLOWED_CATEGORIES: set[str] = set(config.CATEGORIES)
+ALLOWED_PRIORITIES: set[str] = set(config.PRIORITIES)
+ALLOWED_STATUSES: set[str] = set(config.STATUSES)
 
 
 class TicketCreate(BaseModel):
