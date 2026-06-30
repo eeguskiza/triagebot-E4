@@ -47,12 +47,111 @@ jobs:
         run: ruff check .
 
       - name: Tests + coverage
-        run: pytest -v --cov=app --cov-report=html
+        run: pytest -v --cov=app --cov-report=html --cov-report=json:htmlcov/coverage.json
 
-      - name: Upload coverage report
+      - name: Upload coverage artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: coverage-py${{ matrix.python-version }}
           path: htmlcov/
           retention-days: 7
+
+  pages:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+
+    steps:
+      - name: Download coverage 3.11
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-py3.11
+          path: site/py311
+
+      - name: Download coverage 3.12
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-py3.12
+          path: site/py312
+
+      - name: Build index page
+        run: |
+          python3 - <<'EOF'
+          import json, pathlib
+
+          def read_pct(path):
+              with open(path) as f:
+                  return round(json.load(f)["totals"]["percent_covered"], 1)
+
+          pct = {
+              "3.11": read_pct("site/py311/coverage.json"),
+              "3.12": read_pct("site/py312/coverage.json"),
+          }
+
+          def badge(p):
+              color = "#2e7d32" if p >= 65 else "#e65100" if p >= 50 else "#b71c1c"
+              return (
+                  f'<span style="background:{color};color:#fff;'
+                  f'padding:3px 10px;border-radius:12px;font-weight:600">{p}%</span>'
+              )
+
+          rows = "".join(
+              f"<tr><td>Python {v}</td><td>{badge(p)}</td>"
+              f'<td><a href="py{v.replace(".","")}/index.html">Ver informe →</a></td></tr>'
+              for v, p in pct.items()
+          )
+
+          html = f"""<!DOCTYPE html>
+          <html lang="es">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width,initial-scale=1">
+            <title>TriageBot — Cobertura de tests</title>
+            <style>
+              body{{font-family:system-ui,sans-serif;max-width:720px;margin:48px auto;
+                   padding:0 24px;color:#222;background:#fafafa}}
+              h1{{font-size:1.6rem;border-bottom:2px solid #e0e0e0;padding-bottom:12px}}
+              table{{border-collapse:collapse;width:100%;margin:24px 0;background:#fff;
+                     border-radius:8px;overflow:hidden;box-shadow:0 1px 4px #0001}}
+              th,td{{padding:14px 18px;text-align:left}}
+              th{{background:#f5f5f5;font-weight:600;font-size:.9rem;text-transform:uppercase;
+                  letter-spacing:.05em;color:#555}}
+              tr:not(:last-child) td{{border-bottom:1px solid #eee}}
+              a{{color:#1565c0;text-decoration:none}}
+              a:hover{{text-decoration:underline}}
+              footer{{margin-top:40px;font-size:.85rem;color:#888}}
+              code{{background:#eee;padding:1px 5px;border-radius:3px}}
+            </style>
+          </head>
+          <body>
+            <h1>TriageBot · Cobertura de tests</h1>
+            <table>
+              <thead><tr><th>Versión</th><th>Cobertura</th><th>Informe</th></tr></thead>
+              <tbody>{rows}</tbody>
+            </table>
+            <footer>
+              Generado automáticamente en cada push a <code>main</code>.
+              Umbral mínimo: <strong>65%</strong> · <code>app/seed.py</code> excluido.
+            </footer>
+          </body>
+          </html>"""
+
+          pathlib.Path("site/index.html").write_text(html)
+          print(f"Index built — " + " / ".join(f"py{v}: {p}%" for v,p in pct.items()))
+          EOF
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/
+
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4
