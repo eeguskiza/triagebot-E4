@@ -10,9 +10,10 @@ ignore = []
 # Los tests no se reformatean por longitud de línea (los aporta el equipo y no se
 # modifican por estilo): ignoramos solo E501 en todo tests/. El resto de reglas sigue.
 "tests/*.py" = ["E501"]
+"lab9/test_*.py" = ["E501"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "lab9"]
 pythonpath = ["."]
 addopts = "-ra"
 
