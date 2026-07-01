@@ -1,0 +1,25 @@
+{
+  "name": "triage_daily_digest",
+  "version": "1.0.0",
+  "description": "Obtiene los tickets de TriageBot y genera un daily digest en lenguaje natural con conteos por prioridad, categorías principales, tickets urgentes y recomendación de siguiente acción.",
+  "entry": "triage_daily_digest.py",
+  "function": "get_digest",
+  "trigger_examples": [
+    "Dame el resumen de los tickets de hoy",
+    "¿Qué tickets hay pendientes?",
+    "Daily digest de TriageBot",
+    "Estado del tablero de incidencias",
+    "¿Cuántos tickets hay abiertos?"
+  ],
+  "env": {
+    "TRIAGEBOT_BASE_URL": {
+      "description": "URL base del servidor TriageBot (local o ngrok)",
+      "example": "https://cough-vagueness-throwing.ngrok-free.dev",
+      "required": true
+    }
+  },
+  "output": "text",
+  "language": "python",
+  "python_min": "3.9",
+  "dependencies": []
+}
